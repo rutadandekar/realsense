@@ -177,9 +177,11 @@ namespace realsense2_camera
         bool _align_depth;
         bool _sync_frames;
         bool _pointcloud;
+
 #ifdef PLUS_ONE_ROBOTICS
         bool _enable_filter;
 #endif
+
 		PipelineSyncer _syncer;
 
         std::map<stream_index_pair, cv::Mat> _depth_aligned_image;
