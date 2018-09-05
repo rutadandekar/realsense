@@ -104,7 +104,8 @@ namespace realsense2_camera
                                const std::string& from,
                                const std::string& to);
         void publishStaticTransforms();
-        void publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived);
+        void publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived, bool colorized_pointcloud);
+        void publishITRTopic(sensor_msgs::PointCloud2& msg_pointcloud, bool colorized_pointcloud);
         Extrinsics rsExtrinsicsToMsg(const rs2_extrinsics& extrinsics, const std::string& frame_id) const;
         rs2_extrinsics getRsExtrinsics(const stream_index_pair& from_stream, const stream_index_pair& to_stream);
 
@@ -165,10 +166,12 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::vector<rs2::stream_profile>> _enabled_profiles;
 
         ros::Publisher _pointcloud_publisher;
+        ros::Publisher _raw_pointcloud_publisher;
         ros::Time _ros_time_base;
         bool _align_depth;
         bool _sync_frames;
         bool _pointcloud;
+        bool _enable_filter;
 		PipelineSyncer _syncer;
 
         std::map<stream_index_pair, cv::Mat> _depth_aligned_image;
@@ -188,6 +191,7 @@ namespace realsense2_camera
         std::unique_ptr<rs2::disparity_transform> disparity_out;
         rs2::spatial_filter spatial;
         rs2::temporal_filter temporal;
+        rs2::decimation_filter decimation;
     };//end class
 
     class BaseD400Node : public BaseRealSenseNode

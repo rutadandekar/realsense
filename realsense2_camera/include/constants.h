@@ -33,6 +33,7 @@ namespace realsense2_camera
     const uint16_t RS405_PID        = 0x0b0c; // DS5U
 
     const bool ALIGN_DEPTH    = false;
+    const bool ENABLE_FILTER  = false;
     const bool POINTCLOUD     = false;
     const bool SYNC_FRAMES    = false;
 
