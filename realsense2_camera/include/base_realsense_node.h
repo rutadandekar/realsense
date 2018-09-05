@@ -183,6 +183,11 @@ namespace realsense2_camera
 
         std::map<stream_index_pair, bool> _is_frame_arrived;
         const std::string _namespace;
+
+        std::unique_ptr<rs2::disparity_transform> disparity_in;
+        std::unique_ptr<rs2::disparity_transform> disparity_out;
+        rs2::spatial_filter spatial;
+        rs2::temporal_filter temporal;
     };//end class
 
     class BaseD400Node : public BaseRealSenseNode
