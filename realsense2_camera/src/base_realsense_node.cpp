@@ -732,7 +732,7 @@ void BaseRealSenseNode::setupStreams()
                     for (rs2::stream_profile& profile : profiles)
                     {
                         if (profile.fps() == _fps[elem] &&
-                                profile.format() == _format[elem])
+                            profile.format() == _format[elem])
                         {
                             _enabled_profiles[elem].push_back(profile);
                             break;
@@ -746,7 +746,7 @@ void BaseRealSenseNode::setupStreams()
         auto accel_profile = _enabled_profiles.find(ACCEL);
 
         if (gyro_profile != _enabled_profiles.end() &&
-                accel_profile != _enabled_profiles.end())
+            accel_profile != _enabled_profiles.end())
         {
             std::vector<rs2::stream_profile> profiles;
             profiles.insert(profiles.begin(), gyro_profile->second.begin(), gyro_profile->second.end());
@@ -766,7 +766,7 @@ void BaseRealSenseNode::setupStreams()
 
                 auto stream_index = (stream == GYRO.first)?GYRO:ACCEL;
                 if (0 != _info_publisher[stream_index].getNumSubscribers() ||
-                        0 != _imu_publishers[stream_index].getNumSubscribers())
+                    0 != _imu_publishers[stream_index].getNumSubscribers())
                 {
                     double elapsed_camera_ms = (/*ms*/ frame.get_timestamp() - /*ms*/ _camera_time_base) / /*ms to seconds*/ 1000;
                     ros::Time t(_ros_time_base.toSec() + elapsed_camera_ms);
@@ -816,7 +816,7 @@ void BaseRealSenseNode::setupStreams()
         }
 
         if (_enable[DEPTH] &&
-                _enable[FISHEYE])
+            _enable[FISHEYE])
         {
             static const char* frame_id = "depth_to_fisheye_extrinsics";
             auto ex = getRsExtrinsics(DEPTH, FISHEYE);
@@ -825,7 +825,7 @@ void BaseRealSenseNode::setupStreams()
         }
 
         if (_enable[DEPTH] &&
-                _enable[COLOR])
+            _enable[COLOR])
         {
             static const char* frame_id = "depth_to_color_extrinsics";
             auto ex = getRsExtrinsics(DEPTH, COLOR);
@@ -834,7 +834,7 @@ void BaseRealSenseNode::setupStreams()
         }
 
         if (_enable[DEPTH] &&
-                _enable[INFRA1])
+            _enable[INFRA1])
         {
             static const char* frame_id = "depth_to_infra1_extrinsics";
             auto ex = getRsExtrinsics(DEPTH, INFRA1);
@@ -843,7 +843,7 @@ void BaseRealSenseNode::setupStreams()
         }
 
         if (_enable[DEPTH] &&
-                _enable[INFRA2])
+            _enable[INFRA2])
         {
             static const char* frame_id = "depth_to_infra2_extrinsics";
             auto ex = getRsExtrinsics(DEPTH, INFRA2);
