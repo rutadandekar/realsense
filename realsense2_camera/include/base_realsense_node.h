@@ -104,7 +104,12 @@ namespace realsense2_camera
                                const std::string& from,
                                const std::string& to);
         void publishStaticTransforms();
+#ifdef PLUS_ONE_ROBOTICS
+        void publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived, bool colorized_pointcloud);
+        void publishITRTopic(sensor_msgs::PointCloud2& msg_pointcloud, bool colorized_pointcloud);
+#else
         void publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived);
+#endif
         Extrinsics rsExtrinsicsToMsg(const rs2_extrinsics& extrinsics, const std::string& frame_id) const;
         rs2_extrinsics getRsExtrinsics(const stream_index_pair& from_stream, const stream_index_pair& to_stream);
 
@@ -165,10 +170,16 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::vector<rs2::stream_profile>> _enabled_profiles;
 
         ros::Publisher _pointcloud_publisher;
+#ifdef PLUS_ONE_ROBOTICS
+        ros::Publisher _raw_pointcloud_publisher;
+#endif
         ros::Time _ros_time_base;
         bool _align_depth;
         bool _sync_frames;
         bool _pointcloud;
+#ifdef PLUS_ONE_ROBOTICS
+        bool _enable_filter;
+#endif
 		PipelineSyncer _syncer;
 
         std::map<stream_index_pair, cv::Mat> _depth_aligned_image;
@@ -183,6 +194,13 @@ namespace realsense2_camera
 
         std::map<stream_index_pair, bool> _is_frame_arrived;
         const std::string _namespace;
+
+#ifdef PLUS_ONE_ROBOTICS
+        std::unique_ptr<rs2::disparity_transform> disparity_in;
+        std::unique_ptr<rs2::disparity_transform> disparity_out;
+        rs2::spatial_filter spatial;
+        rs2::decimation_filter decimation;
+#endif
     };//end class
 
     class BaseD400Node : public BaseRealSenseNode

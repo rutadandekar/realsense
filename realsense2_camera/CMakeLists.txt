@@ -44,7 +44,7 @@ else()
     message(STATUS "Create Debug Build.")
 endif()
 
-set(CMAKE_CXX_FLAGS "-fPIE -fPIC -std=c++11 -D_FORTIFY_SOURCE=2 -fstack-protector -Wformat -Wformat-security -Wall ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-fPIE -fPIC -std=c++11 -DPLUS_ONE_ROBOTICS -D_FORTIFY_SOURCE=2 -fstack-protector -Wformat -Wformat-security -Wall ${CMAKE_CXX_FLAGS}")
 
 add_message_files(
     FILES

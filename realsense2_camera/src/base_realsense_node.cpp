@@ -10,6 +10,19 @@ std::string BaseRealSenseNode::getNamespaceStr()
     return ns;
 }
 
+#ifdef PLUS_ONE_ROBOTICS
+BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
+                                     ros::NodeHandle& privateNodeHandle,
+                                     rs2::device dev,
+                                     const std::string& serial_no) :
+    _dev(dev),  _node_handle(nodeHandle),
+    _pnh(privateNodeHandle), _json_file_path(""),
+    _serial_no(serial_no), _base_frame_id(""),
+    _intialize_time_base(false),
+    _namespace(getNamespaceStr()),
+    disparity_in(std::unique_ptr<rs2::disparity_transform>(new rs2::disparity_transform(true))),
+    disparity_out(std::unique_ptr<rs2::disparity_transform>(new rs2::disparity_transform(false)))
+#else
 BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
                                      ros::NodeHandle& privateNodeHandle,
                                      rs2::device dev,
@@ -19,6 +32,7 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _serial_no(serial_no), _base_frame_id(""),
     _intialize_time_base(false),
     _namespace(getNamespaceStr())
+#endif
 {
     // Types for depth stream
     _is_frame_arrived[DEPTH] = false;
@@ -102,6 +116,9 @@ void BaseRealSenseNode::getParameters()
 
     _pnh.param("align_depth", _align_depth, ALIGN_DEPTH);
     _pnh.param("enable_pointcloud", _pointcloud, POINTCLOUD);
+#ifdef PLUS_ONE_ROBOTICS
+    _pnh.param("enable_filter", _enable_filter, ENABLE_FILTER);
+#endif
     _pnh.param("enable_sync", _sync_frames, SYNC_FRAMES);
     if (_pointcloud || _align_depth)
         _sync_frames = true;
@@ -210,7 +227,9 @@ void BaseRealSenseNode::setupDevice()
         ROS_INFO_STREAM("Enable PointCloud: " << ((_pointcloud)?"On":"Off"));
         ROS_INFO_STREAM("Align Depth: " << ((_align_depth)?"On":"Off"));
         ROS_INFO_STREAM("Sync Mode: " << ((_sync_frames)?"On":"Off"));
-
+#ifdef PLUS_ONE_ROBOTICS
+        ROS_INFO_STREAM("Filter: " << ((_enable_filter)?"On":"Off"));
+#endif
         auto dev_sensors = _dev.query_sensors();
 
         ROS_INFO_STREAM("Device Sensors: ");
@@ -322,6 +341,9 @@ void BaseRealSenseNode::setupPublishers()
             if (stream == DEPTH && _pointcloud)
             {
                 _pointcloud_publisher = _node_handle.advertise<sensor_msgs::PointCloud2>("depth/color/points", 1);
+#ifdef PLUS_ONE_ROBOTICS
+                _raw_pointcloud_publisher = _node_handle.advertise<sensor_msgs::PointCloud2>("depth/points", 1);
+#endif
             }
         }
     }
@@ -472,70 +494,70 @@ void BaseRealSenseNode::publishAlignedDepthToOthers(rs2::frame depth_frame, cons
 
 void BaseRealSenseNode::enable_devices()
 {
-	for (auto& streams : IMAGE_STREAMS)
-	{
-		for (auto& elem : streams)
-		{
-			if (_enable[elem])
-			{
-				auto& sens = _sensors[elem];
-				auto profiles = sens.get_stream_profiles();
-				for (auto& profile : profiles)
-				{
-					auto video_profile = profile.as<rs2::video_stream_profile>();
-					ROS_DEBUG_STREAM("Sensor profile: " <<
-									 "Format: " << video_profile.format() <<
-									 ", Width: " << video_profile.width() <<
-									 ", Height: " << video_profile.height() <<
-									 ", FPS: " << video_profile.fps());
+    for (auto& streams : IMAGE_STREAMS)
+    {
+        for (auto& elem : streams)
+        {
+            if (_enable[elem])
+            {
+                auto& sens = _sensors[elem];
+                auto profiles = sens.get_stream_profiles();
+                for (auto& profile : profiles)
+                {
+                    auto video_profile = profile.as<rs2::video_stream_profile>();
+                    ROS_DEBUG_STREAM("Sensor profile: " <<
+                                     "Format: " << video_profile.format() <<
+                                     ", Width: " << video_profile.width() <<
+                                     ", Height: " << video_profile.height() <<
+                                     ", FPS: " << video_profile.fps());
 
-					if (video_profile.format() == _format[elem] &&
-						(_width[elem] == 0 || video_profile.width() == _width[elem]) &&
-						(_height[elem] == 0 || video_profile.height() == _height[elem]) &&
-						(_fps[elem] == 0 || video_profile.fps() == _fps[elem]) &&
-						video_profile.stream_index() == elem.second)
-					{
-						_width[elem] = video_profile.width();
-						_height[elem] = video_profile.height();
-						_fps[elem] = video_profile.fps();
+                    if (video_profile.format() == _format[elem] &&
+                            (_width[elem] == 0 || video_profile.width() == _width[elem]) &&
+                            (_height[elem] == 0 || video_profile.height() == _height[elem]) &&
+                            (_fps[elem] == 0 || video_profile.fps() == _fps[elem]) &&
+                            video_profile.stream_index() == elem.second)
+                    {
+                        _width[elem] = video_profile.width();
+                        _height[elem] = video_profile.height();
+                        _fps[elem] = video_profile.fps();
 
-						_enabled_profiles[elem].push_back(profile);
+                        _enabled_profiles[elem].push_back(profile);
 
-						_image[elem] = cv::Mat(_width[elem], _height[elem], _image_format[elem], cv::Scalar(0, 0, 0));
+                        _image[elem] = cv::Mat(_width[elem], _height[elem], _image_format[elem], cv::Scalar(0, 0, 0));
 
-						ROS_INFO_STREAM(_stream_name[elem] << " stream is enabled - width: " << _width[elem] << ", height: " << _height[elem] << ", fps: " << _fps[elem]);
-						break;
-					}
-				}
-				if (_enabled_profiles.find(elem) == _enabled_profiles.end())
-				{
-					ROS_WARN_STREAM("Given stream configuration is not supported by the device! " <<
-						" Stream: " << rs2_stream_to_string(elem.first) <<
-						", Stream Index: " << elem.second <<
-						", Format: " << _format[elem] <<
-						", Width: " << _width[elem] <<
-						", Height: " << _height[elem] <<
-						", FPS: " << _fps[elem]);
-					_enable[elem] = false;
-				}
-			}
-		}
-	}
-	if (_align_depth)
-	{
-		for (auto& profiles : _enabled_profiles)
-		{
-			_depth_aligned_image[profiles.first] = cv::Mat(_width[DEPTH], _height[DEPTH], _image_format[DEPTH], cv::Scalar(0, 0, 0));
-		}
-	}
+                        ROS_INFO_STREAM(_stream_name[elem] << " stream is enabled - width: " << _width[elem] << ", height: " << _height[elem] << ", fps: " << _fps[elem]);
+                        break;
+                    }
+                }
+                if (_enabled_profiles.find(elem) == _enabled_profiles.end())
+                {
+                    ROS_WARN_STREAM("Given stream configuration is not supported by the device! " <<
+                                    " Stream: " << rs2_stream_to_string(elem.first) <<
+                                    ", Stream Index: " << elem.second <<
+                                    ", Format: " << _format[elem] <<
+                                    ", Width: " << _width[elem] <<
+                                    ", Height: " << _height[elem] <<
+                                    ", FPS: " << _fps[elem]);
+                    _enable[elem] = false;
+                }
+            }
+        }
+    }
+    if (_align_depth)
+    {
+        for (auto& profiles : _enabled_profiles)
+        {
+            _depth_aligned_image[profiles.first] = cv::Mat(_width[DEPTH], _height[DEPTH], _image_format[DEPTH], cv::Scalar(0, 0, 0));
+        }
+    }
 }
 
 void BaseRealSenseNode::setupStreams()
 {
-	ROS_INFO("setupStreams...");
-	enable_devices();
+        ROS_INFO("setupStreams...");
+        enable_devices();
     try{
-		// Publish image stream info
+            // Publish image stream info
         for (auto& profiles : _enabled_profiles)
         {
             for (auto& profile : profiles.second)
@@ -586,6 +608,18 @@ void BaseRealSenseNode::setupStreams()
                                   rs2_stream_to_string(stream_type), stream_index, frame.get_frame_number(), frame.get_timestamp(), t.toNSec());
 
                         stream_index_pair sip{stream_type,stream_index};
+#ifdef PLUS_ONE_ROBOTICS
+                        if (!_enable_filter)
+                        {
+                            publishFrame(f, t,
+                                         sip,
+                                         _image,
+                                         _info_publisher,
+                                         _image_publishers, _seq,
+                                         _camera_info, _optical_frame_id,
+                                         _encoding);
+                        }
+#else
                         publishFrame(f, t,
                                      sip,
                                      _image,
@@ -593,12 +627,40 @@ void BaseRealSenseNode::setupStreams()
                                      _image_publishers, _seq,
                                      _camera_info, _optical_frame_id,
                                      _encoding);
+#endif
                         if (_align_depth && stream_type != RS2_STREAM_DEPTH)
                         {
                             frames.push_back(f);
                         }
                         else
                         {
+#ifdef PLUS_ONE_ROBOTICS
+                            if (_enable_filter && is_frame_arrived.at(DEPTH))
+                            {
+                                is_depth_arrived = true;
+
+                                f = decimation.process(f);
+                                f = disparity_in->process(f);
+                                f = disparity_out->process(f);
+
+                                auto video_stream_depth_frame = depth_frame.get_profile().as<rs2::video_stream_profile>();
+                                updateStreamCalibData(video_stream_depth_frame);
+
+                                _image[DEPTH] = cv::Mat(_stream_intrinsics[DEPTH].width, _stream_intrinsics[DEPTH].height, _image_format[DEPTH], cv::Scalar(0, 0, 0));
+                                _image[DEPTH].data = (uint8_t*)depth_frame.get_data();
+                            }
+
+                            if (_enable_filter && is_frame_arrived.at(COLOR))
+                            {
+                                publishFrame(f, t,
+                                             sip,
+                                             _image,
+                                             _info_publisher,
+                                             _image_publishers, _seq,
+                                             _camera_info, _optical_frame_id,
+                                             _encoding);
+                            }
+#endif
                             depth_frame = f;
                             is_depth_arrived = true;
                         }
@@ -627,12 +689,25 @@ void BaseRealSenseNode::setupStreams()
                                  _camera_info, _optical_frame_id,
                                  _encoding);
                 }
+#ifdef PLUS_ONE_ROBOTICS
+                if(_pointcloud && (0 != _pointcloud_publisher.getNumSubscribers()))
+                {
+                    ROS_DEBUG("publishPCTopic(...)");
+                    publishRgbToDepthPCTopic(t, is_frame_arrived, true);
+                }
 
+                if(_pointcloud && (0 != _raw_pointcloud_publisher.getNumSubscribers()))
+                {
+                    ROS_DEBUG("publishPCTopic(...)");
+                    publishRgbToDepthPCTopic(t, is_frame_arrived, false);
+                }
+#else
                 if(_pointcloud && (0 != _pointcloud_publisher.getNumSubscribers()))
                 {
                     ROS_DEBUG("publishPCTopic(...)");
                     publishRgbToDepthPCTopic(t, is_frame_arrived);
                 }
+#endif
             }
             catch(const std::exception& ex)
             {
@@ -1050,6 +1125,155 @@ void BaseRealSenseNode::publishStaticTransforms()
     }
 }
 
+#ifdef PLUS_ONE_ROBOTICS
+void BaseRealSenseNode::publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived , bool colorized_pointcloud)
+{
+    try
+    {
+        if (!is_frame_arrived.at(COLOR) || !is_frame_arrived.at(DEPTH))
+        {
+            ROS_DEBUG("Skipping publish PC topic! Color or Depth frame didn't arrive.");
+            return;
+        }
+    }
+    catch (std::out_of_range)
+    {
+        ROS_DEBUG("Skipping publish PC topic! Color or Depth frame didn't configure.");
+        return;
+    }
+    auto depth_intrinsics = _stream_intrinsics[DEPTH];
+    sensor_msgs::PointCloud2 msg_pointcloud;
+    msg_pointcloud.header.stamp = t;
+    msg_pointcloud.header.frame_id = _optical_frame_id[DEPTH];
+    msg_pointcloud.width = depth_intrinsics.width;
+    msg_pointcloud.height = depth_intrinsics.height;
+    msg_pointcloud.is_dense = true;
+    sensor_msgs::PointCloud2Modifier modifier(msg_pointcloud);
+
+    if(colorized_pointcloud)
+    {
+        modifier.setPointCloud2Fields(4,
+                                      "x", 1, sensor_msgs::PointField::FLOAT32,
+                                      "y", 1, sensor_msgs::PointField::FLOAT32,
+                                      "z", 1, sensor_msgs::PointField::FLOAT32,
+                                      "rgb", 1, sensor_msgs::PointField::FLOAT32);
+        modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
+        publishITRTopic(msg_pointcloud, colorized_pointcloud);
+    }
+    else
+    {
+        modifier.setPointCloud2Fields(3,
+                                      "x", 1, sensor_msgs::PointField::FLOAT32,
+                                      "y", 1, sensor_msgs::PointField::FLOAT32,
+                                      "z", 1, sensor_msgs::PointField::FLOAT32);
+        modifier.setPointCloud2FieldsByString(1, "xyz");
+        publishITRTopic(msg_pointcloud, colorized_pointcloud);
+    }
+}
+
+void BaseRealSenseNode::publishITRTopic(sensor_msgs::PointCloud2& msg_pointcloud, bool colorized_pointcloud)
+{
+    auto& depth2color_extrinsics = _depth_to_other_extrinsics[COLOR];
+    auto color_intrinsics = _stream_intrinsics[COLOR];
+    auto depth_intrinsics = _stream_intrinsics[DEPTH];
+    auto image_depth16 = reinterpret_cast<const uint16_t*>(_image[DEPTH].data);
+    unsigned char* color_data = _image[COLOR].data;
+    const float MIN_DEPTH_THRESHOLD = 0.f;
+    const float MAX_DEPTH_THRESHOLD = 5.f;
+    float depth_point[3], scaled_depth;
+
+    if (colorized_pointcloud)
+    {
+        sensor_msgs::PointCloud2Iterator<float>iter_x(msg_pointcloud, "x");
+        sensor_msgs::PointCloud2Iterator<float>iter_y(msg_pointcloud, "y");
+        sensor_msgs::PointCloud2Iterator<float>iter_z(msg_pointcloud, "z");
+        sensor_msgs::PointCloud2Iterator<uint8_t>iter_r(msg_pointcloud, "r");
+        sensor_msgs::PointCloud2Iterator<uint8_t>iter_g(msg_pointcloud, "g");
+        sensor_msgs::PointCloud2Iterator<uint8_t>iter_b(msg_pointcloud, "b");
+
+        // Fill the PointCloud2 fields
+        for (int y = 0; y < depth_intrinsics.height; ++y)
+        {
+            for (int x = 0; x < depth_intrinsics.width; ++x)
+            {
+                scaled_depth = static_cast<float>(*image_depth16) * _depth_scale_meters;
+                float depth_pixel[2] = {static_cast<float>(x), static_cast<float>(y)};
+                rs2_deproject_pixel_to_point(depth_point, &depth_intrinsics, depth_pixel, scaled_depth);
+
+                if (depth_point[2] <= MIN_DEPTH_THRESHOLD || depth_point[2] > MAX_DEPTH_THRESHOLD)
+                {
+                    depth_point[0] = MIN_DEPTH_THRESHOLD;
+                    depth_point[1] = MIN_DEPTH_THRESHOLD;
+                    depth_point[2] = MIN_DEPTH_THRESHOLD;
+                }
+
+                *iter_x = depth_point[0];
+                *iter_y = depth_point[1];
+                *iter_z = depth_point[2];
+
+                float color_point[3], color_pixel[2];
+
+                rs2_transform_point_to_point(color_point, &depth2color_extrinsics, depth_point);
+                rs2_project_point_to_pixel(color_pixel, &color_intrinsics, color_point);
+
+                if (color_pixel[1] < MIN_DEPTH_THRESHOLD || color_pixel[1] > color_intrinsics.height
+                    || color_pixel[0] < MIN_DEPTH_THRESHOLD || color_pixel[0] > color_intrinsics.width)
+                {
+                    // For out of bounds color data, default to a shade of blue in order to visually distinguish holes.
+                    // This color value is same as the librealsense out of bounds color value.
+                    *iter_r = static_cast<uint8_t>(96);
+                    *iter_g = static_cast<uint8_t>(157);
+                    *iter_b = static_cast<uint8_t>(198);
+                }
+                else
+                {
+                    auto i = static_cast<int>(color_pixel[0]);
+                    auto j = static_cast<int>(color_pixel[1]);
+
+                    auto offset = i * 3 + j * color_intrinsics.width * 3;
+                    *iter_r = static_cast<uint8_t>(color_data[offset]);
+                    *iter_g = static_cast<uint8_t>(color_data[offset + 1]);
+                    *iter_b = static_cast<uint8_t>(color_data[offset + 2]);
+                }
+
+                ++image_depth16;
+                ++iter_x; ++iter_y; ++iter_z;
+                ++iter_r; ++iter_g; ++iter_b;
+            }
+        }
+        _pointcloud_publisher.publish(msg_pointcloud);
+    }
+    else
+    {
+        sensor_msgs::PointCloud2Iterator<float>iter_x(msg_pointcloud, "x");
+        sensor_msgs::PointCloud2Iterator<float>iter_y(msg_pointcloud, "y");
+        sensor_msgs::PointCloud2Iterator<float>iter_z(msg_pointcloud, "z");
+
+        for (int y = 0; y < depth_intrinsics.height; ++y)
+        {
+            for (int x = 0; x < depth_intrinsics.width; ++x)
+            {
+                scaled_depth = static_cast<float>(*image_depth16) * _depth_scale_meters;
+                float depth_pixel[2] = {static_cast<float>(x), static_cast<float>(y)};
+                rs2_deproject_pixel_to_point(depth_point, &depth_intrinsics, depth_pixel, scaled_depth);
+                if (depth_point[2] <= MIN_DEPTH_THRESHOLD || depth_point[2] > MAX_DEPTH_THRESHOLD)
+                {
+                    depth_point[0] = MIN_DEPTH_THRESHOLD;
+                    depth_point[1] = MIN_DEPTH_THRESHOLD;
+                    depth_point[2] = MIN_DEPTH_THRESHOLD;
+                }
+                *iter_x = depth_point[0];
+                *iter_y = depth_point[1];
+                *iter_z = depth_point[2];
+
+                ++image_depth16;
+                ++iter_x; ++iter_y; ++iter_z;
+            }
+        }
+        _raw_pointcloud_publisher.publish(msg_pointcloud);
+    }
+}
+#else
 void BaseRealSenseNode::publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived)
 {
     try
@@ -1148,6 +1372,7 @@ void BaseRealSenseNode::publishRgbToDepthPCTopic(const ros::Time& t, const std::
 
     _pointcloud_publisher.publish(msg_pointcloud);
 }
+#endif
 
 Extrinsics BaseRealSenseNode::rsExtrinsicsToMsg(const rs2_extrinsics& extrinsics, const std::string& frame_id) const
 {
