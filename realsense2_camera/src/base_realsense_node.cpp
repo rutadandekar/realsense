@@ -32,7 +32,6 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _serial_no(serial_no), _base_frame_id(""),
     _intialize_time_base(false),
     _namespace(getNamespaceStr())
-#endif
 {
     // Types for depth stream
     _is_frame_arrived[DEPTH] = false;
@@ -660,11 +659,10 @@ void BaseRealSenseNode::setupStreams()
                                              _image_publishers, _seq,
                                              _camera_info, _optical_frame_id,
                                              _encoding);
-                            }
 #else
                             depth_frame = f;
-                            is_depth_arrived = true;
 #endif
+                            is_depth_arrived = true;
                         }
                     }
 

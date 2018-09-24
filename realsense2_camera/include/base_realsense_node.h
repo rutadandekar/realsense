@@ -200,6 +200,7 @@ namespace realsense2_camera
         std::unique_ptr<rs2::disparity_transform> disparity_out;
         rs2::spatial_filter spatial;
         rs2::temporal_filter temporal;
+#else
         rs2::decimation_filter decimation;
 #endif
     };//end class
