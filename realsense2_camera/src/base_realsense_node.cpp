@@ -643,6 +643,8 @@ void BaseRealSenseNode::setupStreams()
                                 f = disparity_in->process(f);
                                 f = disparity_out->process(f);
 
+                                depth_frame = f;
+
                                 auto video_stream_depth_frame = depth_frame.get_profile().as<rs2::video_stream_profile>();
                                 updateStreamCalibData(video_stream_depth_frame);
 
