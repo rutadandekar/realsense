@@ -32,6 +32,7 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _serial_no(serial_no), _base_frame_id(""),
     _intialize_time_base(false),
     _namespace(getNamespaceStr())
+#endif
 {
     // Types for depth stream
     _is_frame_arrived[DEPTH] = false;
@@ -640,9 +641,7 @@ void BaseRealSenseNode::setupStreams()
 
                                 f = decimation.process(f);
                                 f = disparity_in->process(f);
-                                f = temporal.process(f);
                                 f = disparity_out->process(f);
-                                depth_frame = f;
 
                                 auto video_stream_depth_frame = depth_frame.get_profile().as<rs2::video_stream_profile>();
                                 updateStreamCalibData(video_stream_depth_frame);
@@ -650,6 +649,7 @@ void BaseRealSenseNode::setupStreams()
                                 _image[DEPTH] = cv::Mat(_stream_intrinsics[DEPTH].width, _stream_intrinsics[DEPTH].height, _image_format[DEPTH], cv::Scalar(0, 0, 0));
                                 _image[DEPTH].data = (uint8_t*)depth_frame.get_data();
                             }
+
                             if (_enable_filter && is_frame_arrived.at(COLOR))
                             {
                                 publishFrame(f, t,
@@ -659,9 +659,9 @@ void BaseRealSenseNode::setupStreams()
                                              _image_publishers, _seq,
                                              _camera_info, _optical_frame_id,
                                              _encoding);
-#else
-                            depth_frame = f;
+                            }
 #endif
+                            depth_frame = f;
                             is_depth_arrived = true;
                         }
                     }
