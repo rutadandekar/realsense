@@ -902,6 +902,38 @@ void BaseRealSenseNode::setupStreams()
     }
 }
 
+void BaseRealSenseNode::resetDepthSensor()
+{
+  // Streaming IMAGES
+  for (auto& streams : IMAGE_STREAMS)
+  {
+      std::vector<rs2::stream_profile> profiles;
+      for (auto& elem : streams)
+      {
+          if (!_enabled_profiles[elem].empty())
+          {
+              profiles.insert(profiles.begin(),
+                              _enabled_profiles[elem].begin(),
+                              _enabled_profiles[elem].end());
+          }
+      }
+
+      if (!profiles.empty())
+      {
+          auto stream = streams.front();
+          auto& sens = _sensors[stream];
+          sens.open(profiles);
+
+          if (DEPTH == stream)
+          {
+              auto depth_sensor = sens.as<rs2::depth_sensor>();
+              depth_sensor.stop();
+              depth_sensor.start(_syncer);
+          }
+      }
+  }//end for
+}
+
 void BaseRealSenseNode::updateStreamCalibData(const rs2::video_stream_profile& video_profile)
 {
     stream_index_pair stream_index{video_profile.stream_type(), video_profile.stream_index()};
@@ -1128,12 +1160,20 @@ void BaseRealSenseNode::publishStaticTransforms()
 }
 
 #ifdef PLUS_ONE_ROBOTICS
+static int count_ = 0;
 void BaseRealSenseNode::publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived , bool colorized_pointcloud)
 {
     try
     {
         if (!is_frame_arrived.at(COLOR) || !is_frame_arrived.at(DEPTH))
         {
+            count_++;
+            if (count_ > 5)
+            {
+              count_ = 0;
+              resetDepthSensor();
+            }
+
             ROS_DEBUG("Skipping publish PC topic! Color or Depth frame didn't arrive.");
             return;
         }

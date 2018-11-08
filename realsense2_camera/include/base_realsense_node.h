@@ -107,6 +107,7 @@ namespace realsense2_camera
 #ifdef PLUS_ONE_ROBOTICS
         void publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived, bool colorized_pointcloud);
         void publishITRTopic(sensor_msgs::PointCloud2& msg_pointcloud, bool colorized_pointcloud);
+        void resetDepthSensor();
 #else
         void publishRgbToDepthPCTopic(const ros::Time& t, const std::map<stream_index_pair, bool>& is_frame_arrived);
 #endif
