@@ -939,6 +939,41 @@ void BaseRealSenseNode::resetDepthSensor()
 //          }
       }
   }//end for
+
+  for (auto& streams : IMAGE_STREAMS)
+  {
+      std::vector<rs2::stream_profile> profiles;
+      for (auto& elem : streams)
+      {
+          if (!_enabled_profiles[elem].empty())
+          {
+              profiles.insert(profiles.begin(),
+                              _enabled_profiles[elem].begin(),
+                              _enabled_profiles[elem].end());
+          }
+      }
+
+      if (!profiles.empty())
+      {
+          auto stream = streams.front();
+          auto& sens = _sensors[stream];
+          sens.open(profiles);
+
+//          if (DEPTH == stream)
+//          {
+//              auto depth_sensor = sens.as<rs2::depth_sensor>();
+//              _depth_scale_meters = depth_sensor.get_depth_scale();
+//          }
+
+//          sens.stop();
+//          sens.close();
+
+//          if (_sync_frames)
+//          {
+              sens.start(_syncer);
+//          }
+      }
+  }//end for
 }
 
 void BaseRealSenseNode::updateStreamCalibData(const rs2::video_stream_profile& video_profile)
