@@ -904,6 +904,7 @@ void BaseRealSenseNode::setupStreams()
 
 void BaseRealSenseNode::resetDepthSensor()
 {
+  ROS_ERROR_STREAM("resetDepthSensor()");
   // Streaming IMAGES
   for (auto& streams : IMAGE_STREAMS)
   {
