@@ -905,7 +905,6 @@ void BaseRealSenseNode::setupStreams()
 void BaseRealSenseNode::resetDepthSensor()
 {
   ROS_ERROR_STREAM("resetDepthSensor()");
-  // Streaming IMAGES
   for (auto& streams : IMAGE_STREAMS)
   {
       std::vector<rs2::stream_profile> profiles;
@@ -923,14 +922,21 @@ void BaseRealSenseNode::resetDepthSensor()
       {
           auto stream = streams.front();
           auto& sens = _sensors[stream];
-          sens.open(profiles);
+//          sens.open(profiles);
 
-          if (DEPTH == stream)
-          {
-              auto depth_sensor = sens.as<rs2::depth_sensor>();
-              depth_sensor.stop();
-              depth_sensor.start(_syncer);
-          }
+//          if (DEPTH == stream)
+//          {
+//              auto depth_sensor = sens.as<rs2::depth_sensor>();
+//              _depth_scale_meters = depth_sensor.get_depth_scale();
+//          }
+
+          sens.stop();
+          sens.close();
+
+//          if (_sync_frames)
+//          {
+//              sens.start(_syncer);
+//          }
       }
   }//end for
 }
