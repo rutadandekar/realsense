@@ -31,15 +31,24 @@ namespace realsense2_camera
 {
     const stream_index_pair COLOR{RS2_STREAM_COLOR, 0};
     const stream_index_pair DEPTH{RS2_STREAM_DEPTH, 0};
+#ifdef PLUS_ONE_ROBOTICS
+    const stream_index_pair INFRARGB{RS2_STREAM_INFRARED, 0};
+#endif
     const stream_index_pair INFRA1{RS2_STREAM_INFRARED, 1};
     const stream_index_pair INFRA2{RS2_STREAM_INFRARED, 2};
     const stream_index_pair FISHEYE{RS2_STREAM_FISHEYE, 0};
     const stream_index_pair GYRO{RS2_STREAM_GYRO, 0};
     const stream_index_pair ACCEL{RS2_STREAM_ACCEL, 0};
 
+#ifdef PLUS_ONE_ROBOTICS
+    const std::vector<std::vector<stream_index_pair>> IMAGE_STREAMS = {{{DEPTH, INFRA1, INFRA2, INFRARGB},
+                                                                        {COLOR},
+                                                                        {FISHEYE}}};
+#else
     const std::vector<std::vector<stream_index_pair>> IMAGE_STREAMS = {{{DEPTH, INFRA1, INFRA2},
                                                                         {COLOR},
                                                                         {FISHEYE}}};
+#endif
 
     const std::vector<std::vector<stream_index_pair>> HID_STREAMS = {{GYRO, ACCEL}};
 

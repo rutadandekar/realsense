@@ -43,6 +43,17 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _stream_name[DEPTH] = "depth";
     _depth_aligned_encoding[DEPTH] = sensor_msgs::image_encodings::TYPE_16UC1;
 
+#ifdef PLUS_ONE_ROBOTICS
+    // Infrared stream - Left RGB
+    _is_frame_arrived[INFRARGB] = false;
+    _format[INFRARGB] = RS2_FORMAT_RGB8;   // libRS type
+    _image_format[INFRARGB] = CV_8UC3;    // CVBridge type
+    _encoding[INFRARGB] = sensor_msgs::image_encodings::RGB8; // ROS message type
+    _unit_step_size[INFRARGB] = 3; // sensor_msgs::ImagePtr row step size
+    _stream_name[INFRARGB] = "infrargb";
+    _depth_aligned_encoding[INFRARGB] = sensor_msgs::image_encodings::TYPE_16UC1;
+#endif
+
     // Infrared stream - Left
     _is_frame_arrived[INFRA1] = false;
     _format[INFRA1] = RS2_FORMAT_Y8;   // libRS type
@@ -137,6 +148,14 @@ void BaseRealSenseNode::getParameters()
     _pnh.param("enable_infra1", _enable[INFRA1], ENABLE_INFRA1);
     _aligned_depth_images[INFRA1].resize(_width[DEPTH] * _height[DEPTH] * _unit_step_size[DEPTH]);
 
+#ifdef PLUS_ONE_ROBOTICS
+    _pnh.param("infrargb_width", _width[INFRARGB], INFRARGB_WIDTH);
+    _pnh.param("infrargb_height", _height[INFRARGB], INFRARGB_HEIGHT);
+    _pnh.param("infrargb_fps", _fps[INFRARGB], INFRARGB_FPS);
+    _pnh.param("enable_infrargb", _enable[INFRARGB], ENABLE_INFRARGB);
+    _aligned_depth_images[INFRARGB].resize(_width[DEPTH] * _height[DEPTH] * _unit_step_size[DEPTH]);
+#endif
+
     _pnh.param("infra2_width", _width[INFRA2], INFRA2_WIDTH);
     _pnh.param("infra2_height", _height[INFRA2], INFRA2_HEIGHT);
     _pnh.param("infra2_fps", _fps[INFRA2], INFRA2_FPS);
@@ -162,6 +181,9 @@ void BaseRealSenseNode::getParameters()
 
     _pnh.param("base_frame_id", _base_frame_id, DEFAULT_BASE_FRAME_ID);
     _pnh.param("depth_frame_id", _frame_id[DEPTH], DEFAULT_DEPTH_FRAME_ID);
+#ifdef PLUS_ONE_ROBOTICS
+    _pnh.param("infrargb_frame_id", _frame_id[INFRARGB], DEFAULT_INFRA1_FRAME_ID);
+#endif
     _pnh.param("infra1_frame_id", _frame_id[INFRA1], DEFAULT_INFRA1_FRAME_ID);
     _pnh.param("infra2_frame_id", _frame_id[INFRA2], DEFAULT_INFRA2_FRAME_ID);
     _pnh.param("color_frame_id", _frame_id[COLOR], DEFAULT_COLOR_FRAME_ID);
@@ -170,6 +192,9 @@ void BaseRealSenseNode::getParameters()
     _pnh.param("imu_accel_frame_id", _frame_id[ACCEL], DEFAULT_IMU_FRAME_ID);
 
     _pnh.param("depth_optical_frame_id", _optical_frame_id[DEPTH], DEFAULT_DEPTH_OPTICAL_FRAME_ID);
+#ifdef PLUS_ONE_ROBOTICS
+    _pnh.param("infrargb_optical_frame_id", _optical_frame_id[INFRARGB], DEFAULT_INFRA1_OPTICAL_FRAME_ID);
+#endif
     _pnh.param("infra1_optical_frame_id", _optical_frame_id[INFRA1], DEFAULT_INFRA1_OPTICAL_FRAME_ID);
     _pnh.param("infra2_optical_frame_id", _optical_frame_id[INFRA2], DEFAULT_INFRA2_OPTICAL_FRAME_ID);
     _pnh.param("color_optical_frame_id", _optical_frame_id[COLOR], DEFAULT_COLOR_OPTICAL_FRAME_ID);
@@ -178,6 +203,9 @@ void BaseRealSenseNode::getParameters()
     _pnh.param("accel_optical_frame_id", _optical_frame_id[ACCEL], DEFAULT_ACCEL_OPTICAL_FRAME_ID);
 
     _pnh.param("aligned_depth_to_color_frame_id",   _depth_aligned_frame_id[COLOR],   DEFAULT_ALIGNED_DEPTH_TO_COLOR_FRAME_ID);
+#ifdef PLUS_ONE_ROBOTICS
+    _pnh.param("aligned_depth_to_infrargb_frame_id",  _depth_aligned_frame_id[INFRARGB],  DEFAULT_ALIGNED_DEPTH_TO_INFRA1_FRAME_ID);
+#endif
     _pnh.param("aligned_depth_to_infra1_frame_id",  _depth_aligned_frame_id[INFRA1],  DEFAULT_ALIGNED_DEPTH_TO_INFRA1_FRAME_ID);
     _pnh.param("aligned_depth_to_infra2_frame_id",  _depth_aligned_frame_id[INFRA2],  DEFAULT_ALIGNED_DEPTH_TO_INFRA2_FRAME_ID);
     _pnh.param("aligned_depth_to_fisheye_frame_id", _depth_aligned_frame_id[FISHEYE], DEFAULT_ALIGNED_DEPTH_TO_FISHEYE_FRAME_ID);
@@ -239,6 +267,9 @@ void BaseRealSenseNode::setupDevice()
             if ("Stereo Module" == module_name)
             {
                 _sensors[DEPTH] = elem;
+#ifdef PLUS_ONE_ROBOTICS
+                _sensors[INFRARGB] = elem;
+#endif
                 _sensors[INFRA1] = elem;
                 _sensors[INFRA2] = elem;
             }
@@ -246,6 +277,9 @@ void BaseRealSenseNode::setupDevice()
             {
                 _sensors[DEPTH] = elem;
                 _sensors[INFRA1] = elem;
+#ifdef PLUS_ONE_ROBOTICS
+                _sensors[INFRARGB] = elem;
+#endif
             }
             else if ("RGB Camera" == module_name)
             {
@@ -316,8 +350,13 @@ void BaseRealSenseNode::setupPublishers()
         {
             std::stringstream image_raw, camera_info;
             bool rectified_image = false;
+#ifdef PLUS_ONE_ROBOTICS
+            if (stream == DEPTH || stream == INFRA1 || stream == INFRA2 || stream == INFRARGB)
+                rectified_image = true;
+#else
             if (stream == DEPTH || stream == INFRA1 || stream == INFRA2)
                 rectified_image = true;
+#endif
 
             image_raw << _stream_name[stream] << "/image_" << ((rectified_image)?"rect_":"") << "raw";
             camera_info << _stream_name[stream] << "/camera_info";

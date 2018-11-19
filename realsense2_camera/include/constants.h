@@ -42,6 +42,11 @@ namespace realsense2_camera
     const int DEPTH_WIDTH     = 640;
     const int DEPTH_HEIGHT    = 480;
 
+#ifdef PLUS_ONE_ROBOTICS
+    const int INFRARGB_WIDTH    = 1280;
+    const int INFRARGB_HEIGHT   = 720;
+#endif
+
     const int INFRA1_WIDTH    = 640;
     const int INFRA1_HEIGHT   = 480;
 
@@ -56,6 +61,9 @@ namespace realsense2_camera
 
 
     const int DEPTH_FPS       = 30;
+#ifdef PLUS_ONE_ROBOTICS
+    const int INFRARGB_FPS    = 30;
+#endif
     const int INFRA1_FPS      = 30;
     const int INFRA2_FPS      = 30;
     const int COLOR_FPS       = 30;
@@ -65,6 +73,9 @@ namespace realsense2_camera
 
 
     const bool ENABLE_DEPTH   = true;
+#ifdef PLUS_ONE_ROBOTICS
+    const bool ENABLE_INFRARGB = true;
+#endif
     const bool ENABLE_INFRA1  = true;
     const bool ENABLE_INFRA2  = true;
     const bool ENABLE_COLOR   = true;
