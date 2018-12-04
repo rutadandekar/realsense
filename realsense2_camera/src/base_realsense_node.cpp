@@ -1253,10 +1253,10 @@ void BaseRealSenseNode::publishITRTopic(sensor_msgs::PointCloud2& msg_pointcloud
                 *iter_y = depth_point[1];
                 *iter_z = depth_point[2];
 
-                auto i = static_cast<int>(depth_pixel[0] * width_ratio);
-                auto j = static_cast<int>(depth_pixel[1] * height_ratio);
+                auto i = static_cast<int>(depth_pixel[0] * 2);
+                auto j = static_cast<int>(depth_pixel[1] * 2);
 
-                auto offset = i * 3 + j * depth_intrinsics.width * 3;
+                auto offset = i * 3 + j * infrargb_intrinsics.width * 3;
                 *iter_r = static_cast<uint8_t>(color_data[offset]);
                 *iter_g = static_cast<uint8_t>(color_data[offset + 1]);
                 *iter_b = static_cast<uint8_t>(color_data[offset + 2]);
