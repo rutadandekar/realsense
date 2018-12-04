@@ -1252,30 +1252,13 @@ void BaseRealSenseNode::publishITRTopic(sensor_msgs::PointCloud2& msg_pointcloud
                 *iter_y = depth_point[1];
                 *iter_z = depth_point[2];
 
-                float color_point[3], color_pixel[2];
+                auto i = static_cast<int>(depth_pixel[0] * 2);
+                auto j = static_cast<int>(depth_pixel[1] * 2);
 
-                rs2_transform_point_to_point(color_point, &depth2color_extrinsics, depth_point);
-                rs2_project_point_to_pixel(color_pixel, &color_intrinsics, color_point);
-
-                if (color_pixel[1] < MIN_DEPTH_THRESHOLD || color_pixel[1] > color_intrinsics.height
-                    || color_pixel[0] < MIN_DEPTH_THRESHOLD || color_pixel[0] > color_intrinsics.width)
-                {
-                    // For out of bounds color data, default to a shade of blue in order to visually distinguish holes.
-                    // This color value is same as the librealsense out of bounds color value.
-                    *iter_r = static_cast<uint8_t>(96);
-                    *iter_g = static_cast<uint8_t>(157);
-                    *iter_b = static_cast<uint8_t>(198);
-                }
-                else
-                {
-                    auto i = static_cast<int>(color_pixel[0]);
-                    auto j = static_cast<int>(color_pixel[1]);
-
-                    auto offset = i * 3 + j * color_intrinsics.width * 3;
-                    *iter_r = static_cast<uint8_t>(color_data[offset]);
-                    *iter_g = static_cast<uint8_t>(color_data[offset + 1]);
-                    *iter_b = static_cast<uint8_t>(color_data[offset + 2]);
-                }
+                auto offset = i * 3 + j * infrargb_intrinsics.width * 3;
+                *iter_r = static_cast<uint8_t>(color_data[offset]);
+                *iter_g = static_cast<uint8_t>(color_data[offset + 1]);
+                *iter_b = static_cast<uint8_t>(color_data[offset + 2]);
 
                 ++image_depth16;
                 ++iter_x; ++iter_y; ++iter_z;
