@@ -2,8 +2,8 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+100.0.9 (2019-02-07)
+--------------------
 * [fix] null depth frame. `#4 <https://github.com/plusone-robotics/realsense/issues/4>`_
 * Contributors: Isaac I.Y. Saito, Joshua Curtis, Shaun Edwards
 
