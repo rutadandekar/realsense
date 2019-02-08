@@ -2,8 +2,8 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+100.0.8 (2019-02-07)
+--------------------
 * [capability] Ir-RGB integration  `#12 <https://github.com/plusone-robotics/realsense/issues/12>`_
 * Filters for Plus One Robotics. `#3 <https://github.com/plusone-robotics/realsense/issues/3>`_
 * Contributors: Isaac I.Y. Saito, Joshua Curtis, Shaun Edwards
