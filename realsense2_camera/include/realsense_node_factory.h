@@ -26,6 +26,9 @@
 #include <eigen3/Eigen/Geometry>
 #include <fstream>
 
+#include <mutex>
+#include <condition_variable>
+
 
 namespace realsense2_camera
 {
@@ -74,6 +77,7 @@ namespace realsense2_camera
         virtual ~RealSenseNodeFactory() {}
 
     private:
+        rs2::device getDevice(std::string& serial_no);
         virtual void onInit() override;
         void tryGetLogSeverity(rs2_log_severity& severity) const;
 
