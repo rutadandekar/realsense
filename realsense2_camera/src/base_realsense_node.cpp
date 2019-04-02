@@ -86,7 +86,6 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _is_initialized_time_base(false),
     _namespace(getNamespaceStr())
 {
-    // if( ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug) ) ros::console::notifyLoggerLevelsChanged();
     // Types for depth stream
     _image_format[RS2_STREAM_DEPTH] = CV_16UC1;    // CVBridge type
     _encoding[RS2_STREAM_DEPTH] = sensor_msgs::image_encodings::TYPE_16UC1; // ROS message type
@@ -95,9 +94,6 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _depth_aligned_encoding[RS2_STREAM_DEPTH] = sensor_msgs::image_encodings::TYPE_16UC1;
 
     // Infrared-rgb stream
-    // _image_format[RS2_STREAM_INFRARED] = CV_8UC1;    // CVBridge type
-    // _encoding[RS2_STREAM_INFRARED] = sensor_msgs::image_encodings::MONO8; // ROS message type
-    // _unit_step_size[RS2_STREAM_INFRARED] = sizeof(uint8_t); // sensor_msgs::ImagePtr row step size
     _image_format[RS2_STREAM_INFRARED] = CV_8UC3;    // CVBridge type
     _encoding[RS2_STREAM_INFRARED] = sensor_msgs::image_encodings::RGB8; // ROS message type
     _unit_step_size[RS2_STREAM_INFRARED] = 3; // sensor_msgs::ImagePtr row step size
@@ -1399,7 +1395,6 @@ void BaseRealSenseNode::frame_callback(rs2::frame frame)
                                 _encoding);
             }
 
-            ROS_DEBUG_STREAM("depth_arrived:"<<is_depth_arrived);
             if (_align_depth && is_depth_arrived)
             {
                 ROS_DEBUG("publishAlignedDepthToOthers(...)");
