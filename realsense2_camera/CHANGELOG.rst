@@ -2,8 +2,8 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+100.1.0 (2019-04-03)
+--------------------
 * Changes to add ir-rgb frame `#21 <https://github.com/plusone-robotics/realsense/issues/21>`_ 
 * Contributors: Abhijit Majumdar, Isaac I.Y. Saito
 
