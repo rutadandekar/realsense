@@ -788,13 +788,11 @@ void BaseRealSenseNode::enable_devices()
                                     ", Width: " << video_profile.width() <<
                                     ", Height: " << video_profile.height() <<
                                     ", FPS: " << video_profile.fps());
-                if(INFRA1==elem)
-                {
                   if ((video_profile.stream_type() == elem.first) &&
                       (_width[elem] == 0 || video_profile.width() == _width[elem]) &&
                       (_height[elem] == 0 || video_profile.height() == _height[elem]) &&
                       (_fps[elem] == 0 || video_profile.fps() == _fps[elem]) &&
-                      (video_profile.format() == RS2_FORMAT_RGB8))
+                      ((INFRA1==elem && video_profile.format()==RS2_FORMAT_RGB8) || (INFRA1!=elem && video_profile.stream_index()==elem.second)))
                   {
                       _width[elem] = video_profile.width();
                       _height[elem] = video_profile.height();
@@ -807,27 +805,6 @@ void BaseRealSenseNode::enable_devices()
                       ROS_INFO_STREAM(STREAM_NAME(elem) << " stream is enabled - width: " << _width[elem] << ", height: " << _height[elem] << ", fps: " << _fps[elem]);
                       break;
                   }
-                }
-                else
-                {
-                  if ((video_profile.stream_type() == elem.first) &&
-                      (_width[elem] == 0 || video_profile.width() == _width[elem]) &&
-                      (_height[elem] == 0 || video_profile.height() == _height[elem]) &&
-                      (_fps[elem] == 0 || video_profile.fps() == _fps[elem]) &&
-                      video_profile.stream_index() == elem.second)
-                  {
-                      _width[elem] = video_profile.width();
-                      _height[elem] = video_profile.height();
-                      _fps[elem] = video_profile.fps();
-
-                      _enabled_profiles[elem].push_back(profile);
-
-                      _image[elem] = cv::Mat(_height[elem], _width[elem], _image_format[elem.first], cv::Scalar(0, 0, 0));
-
-                      ROS_INFO_STREAM(STREAM_NAME(elem) << " stream is enabled - width: " << _width[elem] << ", height: " << _height[elem] << ", fps: " << _fps[elem]);
-                      break;
-                  }
-                }
             }
             if (_enabled_profiles.find(elem) == _enabled_profiles.end())
             {
