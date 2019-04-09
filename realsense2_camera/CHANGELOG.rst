@@ -2,6 +2,16 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+100.223.1 (2019-04-09)
+----------------------
+* Plus One Robotics branch synced with the upstream v2.2.3 https://github.com/plusone-robotics/realsense/pull/23
+
+2.2.3 (2019-04-xx)
+------------------
+
+2.2.2 (2019-04-xx)
+------------------
+
 100.1.0 (2019-04-03)
 --------------------
 * Changes to add ir-rgb frame `#21 <https://github.com/plusone-robotics/realsense/issues/21>`_ 
