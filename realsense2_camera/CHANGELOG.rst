@@ -2,6 +2,11 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* [capability] add decimation filter at the front of the filter list, before the start of disparity filter `#24 <https://github.com/plusone-robotics/realsense/issues/24>`_  
+* Contributors: Abhijit Majumdar, Isaac I.Y. Saito
+
 100.223.1 (2019-04-09)
 ----------------------
 * Plus One Robotics branch synced with the upstream v2.2.3 https://github.com/plusone-robotics/realsense/pull/23

@@ -2,6 +2,9 @@
 Changelog for package ddynamic_reconfigure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 0.0.6 (2018-07-02)
 ------------------
 * Recreated classes to enable OOD (adding more param types will be easy)
