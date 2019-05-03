@@ -2,8 +2,8 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+100.223.3 (2019-05-02)
+----------------------
 * [fix] reset feature didn't function when spawning multiple realsense cameras `#26 <https://github.com/plusone-robotics/realsense/issues/26>`_
 * Contributors: Abhijit Majumdar
 
