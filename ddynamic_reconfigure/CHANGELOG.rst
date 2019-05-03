@@ -2,6 +2,9 @@
 Changelog for package ddynamic_reconfigure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 100.223.2 (2019-04-29)
 ----------------------
 

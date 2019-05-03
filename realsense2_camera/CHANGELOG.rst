@@ -2,6 +2,11 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* [fix] reset feature didn't function when spawning multiple realsense cameras `#26 <https://github.com/plusone-robotics/realsense/issues/26>`_
+* Contributors: Abhijit Majumdar
+
 100.223.2 (2019-04-29)
 ----------------------
 * [capability] add decimation filter at the front of the filter list, before the start of disparity filter `#24 <https://github.com/plusone-robotics/realsense/issues/24>`_  
