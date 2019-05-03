@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <thread>
 #include <sys/time.h>
+#include <chrono>
 
 using namespace realsense2_camera;
 
@@ -87,21 +88,6 @@ rs2::device RealSenseNodeFactory::getDevice()
 		_ctx.unload_tracking_module();
 	}
 
-	if (retDev && _initial_reset)
-	{
-		_initial_reset = false;
-		try
-		{
-			ROS_INFO("Resetting device...");
-			retDev.hardware_reset();
-			retDev = rs2::device();
-			
-		}
-		catch(const std::exception& ex)
-		{
-			ROS_WARN_STREAM("An exception has been thrown: " << ex.what());
-		}
-	}
 	return retDev;
 }
 
@@ -158,10 +144,25 @@ void RealSenseNodeFactory::onInit()
 		}
 		else
 		{
-			std::function<void(rs2::event_information&)> change_device_callback_function = [this](rs2::event_information& info){change_device_callback(info);};
-			_ctx.set_devices_changed_callback(change_device_callback_function);
 			privateNh.param("initial_reset", _initial_reset, false);
 			_device = getDevice();
+			if (_device && _initial_reset)
+			{
+				_initial_reset = false;
+				try
+				{
+					ROS_INFO_STREAM("Resetting device with ID "<<_serial_no);
+					_device.hardware_reset();
+					std::this_thread::sleep_for (std::chrono::seconds(10));
+					_device = getDevice();
+				}
+				catch(const std::exception& ex)
+				{
+					ROS_WARN_STREAM("An exception has been thrown: " << ex.what());
+				}
+			}
+			std::function<void(rs2::event_information&)> change_device_callback_function = [this](rs2::event_information& info){change_device_callback(info);};
+			_ctx.set_devices_changed_callback(change_device_callback_function);
 		}
 
 		if (_device)
