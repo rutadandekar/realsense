@@ -101,7 +101,7 @@ namespace realsense2_camera
         void toggleSensors(bool enabled);
         virtual void publishTopics() override;
         virtual void registerDynamicReconfigCb(ros::NodeHandle& nh) override;
-        virtual ~BaseRealSenseNode() {}
+        virtual ~BaseRealSenseNode();
 
     public:
         enum imu_sync_method{NONE, COPY, LINEAR_INTERPOLATION};

@@ -20,14 +20,12 @@ constexpr auto realsense_ros_camera_version = REALSENSE_ROS_EMBEDDED_VERSION_STR
 
 PLUGINLIB_EXPORT_CLASS(realsense2_camera::RealSenseNodeFactory, nodelet::Nodelet)
 
-rs2::device _device;
-
-RealSenseNodeFactory::RealSenseNodeFactory()
+RealSenseNodeFactory::RealSenseNodeFactory() :
+	_is_alive(true)
 {
 	ROS_INFO("RealSense ROS v%s", REALSENSE_ROS_VERSION_STR);
 	ROS_INFO("Running with LibRealSense v%s", RS2_API_VERSION_STR);
 
-	signal(SIGINT, signalHandler);
 	auto severity = rs2_log_severity::RS2_LOG_SEVERITY_WARN;
 	tryGetLogSeverity(severity);
 	if (rs2_log_severity::RS2_LOG_SEVERITY_DEBUG == severity)
@@ -36,21 +34,13 @@ RealSenseNodeFactory::RealSenseNodeFactory()
 	rs2::log_to_console(severity);
 }
 
-void RealSenseNodeFactory::closeDevice()
+RealSenseNodeFactory::~RealSenseNodeFactory()
 {
-    for(rs2::sensor sensor : _device.query_sensors())
+	_is_alive = false;
+	if (_query_thread.joinable())
 	{
-		sensor.stop();
-		sensor.close();
+		_query_thread.join();
 	}
-}
-
-void RealSenseNodeFactory::signalHandler(int signum)
-{
-	ROS_INFO_STREAM(strsignal(signum) << " Signal is received! Terminating RealSense Node...");
-	closeDevice();
-	ros::shutdown();
-	exit(signum);
 }
 
 rs2::device RealSenseNodeFactory::getDevice()
@@ -145,24 +135,25 @@ void RealSenseNodeFactory::onInit()
 		else
 		{
 			privateNh.param("initial_reset", _initial_reset, false);
-			_device = getDevice();
-			if (_device && _initial_reset)
-			{
-				_initial_reset = false;
-				try
-				{
-					ROS_INFO_STREAM("Resetting device with ID "<<_serial_no);
-					_device.hardware_reset();
-					std::this_thread::sleep_for (std::chrono::seconds(10));
-					_device = getDevice();
-				}
-				catch(const std::exception& ex)
-				{
-					ROS_WARN_STREAM("An exception has been thrown: " << ex.what());
-				}
-			}
-			std::function<void(rs2::event_information&)> change_device_callback_function = [this](rs2::event_information& info){change_device_callback(info);};
-			_ctx.set_devices_changed_callback(change_device_callback_function);
+
+			_query_thread = std::thread([=]()
+						{
+							std::chrono::milliseconds timespan(6000);
+							while (_is_alive && !_device)
+							{
+								getDevice();
+								if (_device)
+								{
+									std::function<void(rs2::event_information&)> change_device_callback_function = [this](rs2::event_information& info){change_device_callback(info);};
+									_ctx.set_devices_changed_callback(change_device_callback_function);
+									StartDevice();
+								}
+								else
+								{
+									std::this_thread::sleep_for(timespan);
+								}
+							}
+						});
 		}
 
 		if (_device)
