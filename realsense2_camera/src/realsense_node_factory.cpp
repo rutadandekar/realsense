@@ -257,7 +257,7 @@ void RealSenseNodeFactory::dataMonitor(const ros::TimerEvent &e)
 		else if (_timeout_action == TIMEOUT_RESET)
 		{
 			ROS_ERROR("Realsense data timed out. Resetting driver.");
-			ROS_ERROR("The following topics were stale:");
+			ROS_ERROR_STREAM("The following topics were stale for ", timeout, "secs:");
 			for (const auto& topic: stale_topics)
 			{
 				ROS_ERROR("  %s", topic.c_str());
@@ -267,7 +267,7 @@ void RealSenseNodeFactory::dataMonitor(const ros::TimerEvent &e)
 		else if (_timeout_action == TIMEOUT_SHUTDOWN)
 		{
 			ROS_ERROR("Realsense data timed out. Shutting down driver.");
-			ROS_ERROR("The following topics were stale:");
+			ROS_ERROR_STREAM("The following topics were stale for ", timeout, "secs:");
 			for (const auto& topic: stale_topics)
 			{
 				ROS_ERROR("  %s", topic.c_str());
