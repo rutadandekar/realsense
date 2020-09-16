@@ -2,6 +2,11 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Support for topic monitoring and cleanly shutting down or resetting driver without killing nodelet manager. `#28 <https://github.com/plusone-robotics/realsense/issues/28>`_
+* Contributors: Isaac I.Y. Saito, Marc Alban
+
 100.223.3 (2019-05-02)
 ----------------------
 * [fix] reset feature didn't function when spawning multiple realsense cameras `#26 <https://github.com/plusone-robotics/realsense/issues/26>`_
