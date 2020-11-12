@@ -2,6 +2,11 @@
 Changelog for package realsense2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+100.223.5 (2020-11-12)
+----------------------
+* Abnormal release. Changes are omitted from this tag and will be corrected in next release.
+* Contributors: Isaac I.Y. Saito, Abhijit Majumdar, Marc Alban
+
 100.223.4 (2020-09-16)
 ----------------------
 * Support for topic monitoring and cleanly shutting down or resetting driver without killing nodelet manager. `#28 <https://github.com/plusone-robotics/realsense/issues/28>`

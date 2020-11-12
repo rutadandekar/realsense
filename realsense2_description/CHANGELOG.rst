@@ -2,6 +2,10 @@
 Changelog for package realsense2_description
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+100.223.5 (2020-11-12)
+----------------------
+* Abnormal release. Changes are omitted from this tag and will be corrected in next release.
+
 2.2.17 (2020-09-09)
 -------------------
 
@@ -26,7 +30,7 @@ Changelog for package realsense2_description
 2.2.14 (2020-06-18)
 -------------------
 * fix urdf issues (arg use_nominal_extrinsics).
-* Add noetic support: 
+* Add noetic support:
   - urdf files.
   - change state_publisher into robot_state_publisher
 * correct offset between camera_link and base_link
