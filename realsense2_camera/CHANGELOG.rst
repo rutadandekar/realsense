@@ -4,17 +4,17 @@ Changelog for package realsense2_camera
 
 100.223.4 (2020-09-16)
 ----------------------
-* Support for topic monitoring and cleanly shutting down or resetting driver without killing nodelet manager. `#28 <https://github.com/plusone-robotics/realsense/issues/28>`_
+* Support for topic monitoring and cleanly shutting down or resetting driver without killing nodelet manager. `#28 <https://github.com/plusone-robotics/realsense/issues/28>`
 * Contributors: Isaac I.Y. Saito, Marc Alban
 
 100.223.3 (2019-05-02)
 ----------------------
-* [fix] reset feature didn't function when spawning multiple realsense cameras `#26 <https://github.com/plusone-robotics/realsense/issues/26>`_
+* [fix] reset feature didn't function when spawning multiple realsense cameras `#26 <https://github.com/plusone-robotics/realsense/issues/26>`
 * Contributors: Abhijit Majumdar
 
 100.223.2 (2019-04-29)
 ----------------------
-* [capability] add decimation filter at the front of the filter list, before the start of disparity filter `#24 <https://github.com/plusone-robotics/realsense/issues/24>`_  
+* [capability] add decimation filter at the front of the filter list, before the start of disparity filter `#24 <https://github.com/plusone-robotics/realsense/issues/24>`
 * Contributors: Abhijit Majumdar, Isaac I.Y. Saito
 
 100.223.1 (2019-04-09)
@@ -29,8 +29,47 @@ Changelog for package realsense2_camera
 
 100.1.0 (2019-04-03)
 --------------------
-* Changes to add ir-rgb frame `#21 <https://github.com/plusone-robotics/realsense/issues/21>`_ 
+* Changes to add ir-rgb frame `#21 <https://github.com/plusone-robotics/realsense/issues/21>`
 * Contributors: Abhijit Majumdar, Isaac I.Y. Saito
+
+2.2.17 (2020-09-09)
+--------------------
+* Fix for ROS on Windows
+* Contributors: Lou Amadio, doronhi
+
+2.2.16 (2020-08-06)
+--------------------
+* Add PID to support D455.
+* Improve instability of dynamic reconfigurable options.
+* rs_camera.lauch: add "enable_infra" for L515 support.
+* Contributors: doronhi
+
+2.2.15 (2020-07-13)
+--------------------
+* Check runtime version of librealsense2 vs. compiled version and issue a warning is mismatch occurs.
+* Support both L515 and L515 pre-prq versions.
+* set infra, fisheye, IMU and pose streams to be false by default.
+* add d435i-xacro
+* comply to ROS Noetic xacro rules (backcompatible with ROS Melodic)
+* Contributors: Marco Camurri, doronhi
+
+2.2.14 (2020-06-18)
+--------------------
+* Fix compatibility with Librealsense2 Version 2.35.2.
+* Fix support for L515.
+* Fix urdf issues.
+* Add noetic support: change state_publisher into robot_state_publisher
+* fix distortion correction model for T265 (equidistant)
+* fix stability issues. Stop sensors at program termination.
+* Contributors: Brice, Helen Oleynikova, doronhi
+
+* upgrade version to 2.2.13
+* fix ctrl-C closing issues.
+* handle device creation exceptions.
+* support LiDAR camera L515.
+* optimize pointcloud. Contributors: Davide Faconti
+* fix usb port id parsing issues.
+* Add eigen dependency - missing for Melodic. Contributors: Antoine Hoarau
 
 2.2.1 (2019-03-07)
 ------------------
