@@ -2,7 +2,7 @@
 Changelog for package realsense2_description
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-100.223.5 (2020-11-12)
+100.2217.1 (2020-11-12)
 ----------------------
 * Abnormal release. Changes are omitted from this tag and will be corrected in next release.
 
