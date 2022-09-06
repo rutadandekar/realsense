@@ -41,7 +41,7 @@ endif()
 if (WIN32)
 find_package(realsense2 CONFIG REQUIRED)
 else()
-find_package(realsense2 2.50.0)
+find_package(realsense2 2.41.0)
 endif()
 
 if(NOT realsense2_FOUND)
@@ -107,6 +107,7 @@ add_library(${PROJECT_NAME}
     include/realsense2_camera/realsense_node_factory.h
     include/realsense2_camera/base_realsense_node.h
     include/realsense2_camera/t265_realsense_node.h
+    src/camera_driver.cpp
     src/realsense_node_factory.cpp
     src/base_realsense_node.cpp
     src/t265_realsense_node.cpp
@@ -141,7 +142,7 @@ install(TARGETS ${PROJECT_NAME}
     )
 
 # Install header files
-install(DIRECTORY include/realsense2_camera
+install(DIRECTORY include/realsense2_camera/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
     )
 

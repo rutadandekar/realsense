@@ -162,7 +162,7 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::string> _frame_id;
         std::map<stream_index_pair, std::string> _optical_frame_id;
         std::map<stream_index_pair, std::string> _depth_aligned_frame_id;
-        ros::NodeHandle& _node_handle, _pnh;
+        ros::NodeHandle _node_handle, _pnh;
         bool _align_depth;
         std::vector<rs2_option> _monitor_options;
         std::shared_ptr<ros::ServiceServer> _device_info_srv;
@@ -178,8 +178,6 @@ namespace realsense2_camera
                                const std::string& from,
                                const std::string& to);
 
-
-    private:
         class CimuData
         {
             public:
@@ -240,7 +238,7 @@ namespace realsense2_camera
         void imu_callback_sync(rs2::frame frame, imu_sync_method sync_method=imu_sync_method::COPY);
         void pose_callback(rs2::frame frame);
         void multiple_message_callback(rs2::frame frame, imu_sync_method sync_method);
-        void frame_callback(rs2::frame frame);
+        virtual void frame_callback(rs2::frame frame);
         void registerDynamicOption(ros::NodeHandle& nh, rs2::options sensor, std::string& module_name);
         void registerHDRoptions();
         void set_sensor_parameter_to_ros(const std::string& module_name, rs2::options sensor, rs2_option option);
