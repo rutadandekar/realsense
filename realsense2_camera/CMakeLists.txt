@@ -142,7 +142,7 @@ install(TARGETS ${PROJECT_NAME}
     )
 
 # Install header files
-install(DIRECTORY include/realsense2_camera
+install(DIRECTORY include/realsense2_camera/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
     )
 
