@@ -332,6 +332,45 @@ void CameraDriver::stop()
     std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->stopStreams();
 }
 
+double CameraDriver::getProjectorTemperature() const
+{
+    if (!_camera)
+    {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    // https://github.com/IntelRealSense/librealsense/issues/866#issuecomment-357461253
+    auto dbg = _device.as<rs2::debug_protocol>();
+    std::vector<uint8_t> cmd = { 0x14, 0, 0xab, 0xcd, 0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    auto res = dbg.send_and_receive_raw_data(cmd);
+    return res[4];
+}
+
+size_t CameraDriver::getCorruptedFrames() const
+{
+    return _corrupted_frames;
+}
+
+size_t CameraDriver::getHardwareErrors() const
+{
+    return _hardware_errors;
+}
+
+size_t CameraDriver::getHardwareEvents() const
+{
+    return _hardware_events;
+}
+
+size_t CameraDriver::getTimedOutFrames() const
+{
+    return _hardware_events;
+}
+
+size_t CameraDriver::getUnspecifiedErrors() const
+{
+    return _unspecified_errors;
+}
+
 bool CameraDriver::initialize()
 {
     if (!_camera)
@@ -348,6 +387,35 @@ bool CameraDriver::initialize()
     }
 
     camera->setCallback(std::bind(&CameraDriver::handleFrames, this, std::placeholders::_1));
+
+    // setup notifications
+    for (auto&& s: _device.query_sensors())
+    {
+        s.set_notifications_callback([&](const rs2::notification& n)
+        {
+            auto category = n.get_category();
+            if (category == RS2_NOTIFICATION_CATEGORY_FRAMES_TIMEOUT)
+            {
+                _timed_out_frames++;
+            }
+            else if (category == RS2_NOTIFICATION_CATEGORY_FRAME_CORRUPTED)
+            {
+                _corrupted_frames++;
+            }
+            else if (category == RS2_NOTIFICATION_CATEGORY_HARDWARE_ERROR)
+            {
+                _hardware_errors++;
+            }
+            else if (category == RS2_NOTIFICATION_CATEGORY_HARDWARE_EVENT)
+            {
+                _hardware_events++;
+            }
+            else if (category == RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR)
+            {
+                _unspecified_errors++;
+            }
+        });
+    }
 
     return true;
 }
