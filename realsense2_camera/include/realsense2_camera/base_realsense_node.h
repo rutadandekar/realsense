@@ -164,7 +164,7 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::string> _frame_id;
         std::map<stream_index_pair, std::string> _optical_frame_id;
         std::map<stream_index_pair, std::string> _depth_aligned_frame_id;
-        ros::NodeHandle& _node_handle, _pnh;
+        ros::NodeHandle _node_handle, _pnh;
         bool _align_depth;
         std::vector<rs2_option> _monitor_options;
         std::shared_ptr<ros::ServiceServer> _device_info_srv;
