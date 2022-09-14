@@ -63,12 +63,22 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
 {
     if (!tf_prefix.empty()) {
 
+        std::string param_value;
+        if (!_pnh.getParam("base_frame_id", param_value))
+        {
+            _pnh.setParam("base_frame_id", tf_prefix + "_link");
+        }
+
+        if (!_pnh.getParam("odom_frame_id", param_value))
+        {
+            _pnh.setParam("odom_frame_id", tf_prefix + "_odom_frame");
+        }
+
         std::vector<stream_index_pair> streams(realsense2_camera::IMAGE_STREAMS);
         streams.insert(streams.end(), HID_STREAMS.begin(), HID_STREAMS.end());
         for (auto& stream : streams)
         {
             std::string stream_name = _stream_name[stream.first] + (stream.second > 0 ? std::to_string(stream.second) : "");
-            std::string param_value;
             if (!_pnh.getParam(stream_name + "_frame_id", param_value))
             {
                 _pnh.setParam(stream_name + "_frame_id", tf_prefix + "_" + stream_name + "_frame");
@@ -81,7 +91,6 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
 
         auto stream = realsense2_camera::COLOR;
         std::string stream_name = _stream_name[stream.first] + (stream.second > 0 ? std::to_string(stream.second) : "");
-        std::string param_value;
         if (!_pnh.getParam("aligned_depth_to_" + stream_name + "_frame_id", param_value))
         {
             _pnh.setParam("aligned_depth_to_" + stream_name + "_frame_id", tf_prefix + "_aligned_depth_to_" + stream_name + "_frame");
@@ -143,7 +152,6 @@ RawFramesPtr PolledRealsenseNode::getFrames(int timeout_ms)
     lock.unlock();
 
     stopStreams();
-    ROS_WARN("Failed to stop streams.");
 
     // disable polling mode
     {
@@ -206,7 +214,7 @@ void PolledRealsenseNode::startStreams()
     {
         for (auto& sensor: _enabled_sensors)
         {
-            sensor.second.start(_sensors_callback[sensor.first]);
+            sensor.second.start([this](rs2::frame frame){ frame_callback(frame); });
         }
     }
 
@@ -378,7 +386,8 @@ bool CameraDriver::initialize()
         return false;
     }
 
-    std::string tf_prefix = _pnh.param("tf_prefix", std::string(""));
+    std::string tf_prefix_resolved = _pnh.resolveName("tf_prefix");
+    ROS_ERROR("tf_prefix: [%s]", tf_prefix.c_str());
 
     auto camera = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera);
     if (!camera->initialize(tf_prefix))
@@ -486,7 +495,6 @@ bool CameraDriver::create() {
 
 void CameraDriver::handleFrames(std::shared_ptr<std::map<stream_index_pair, rs2::frame>> frames)
 {
-
     auto buffer = _frame_buffer;
     _frame_buffer = {};
     if (!buffer)
