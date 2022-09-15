@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <mutex>
 #include <string>
 
 #include <realsense2_camera/base_realsense_node.h>
@@ -28,7 +29,7 @@ class CameraDriver
         bool initialize();
         void reset();
         void setCallback(FrameCallback callback);
-        FramesPtr getFrames(double timeout);
+        FramesPtr getFrames(double timeout, ros::Time stamp = ros::Time(0));
         void setFrameBuffer(FramesPtr frame_buffer);
         void start();
         void stop();
@@ -50,6 +51,7 @@ class CameraDriver
         std::shared_ptr<BaseRealSenseNode> _camera;
         FrameCallback _frame_callback;
 
+        std::mutex _get_frames_mutex;
         FramesPtr _frame_buffer;
 
         size_t _corrupted_frames = 0;

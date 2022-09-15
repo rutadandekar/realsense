@@ -3,7 +3,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
-#include <mutex>
 #include <thread>
 #include <unordered_map>
 
@@ -26,7 +25,7 @@ class PolledRealsenseNode : public BaseRealSenseNode
         virtual ~PolledRealsenseNode();
 
         bool initialize(const std::string& tf_prefix);
-        RawFramesPtr getFrames(int timeout_ms);
+        RawFramesPtr getFrames(int timeout_ms, const ros::Time& stamp);
         void setCallback(FrameCallback callback);
         sensor_msgs::CameraInfo::Ptr updateCameraInfo(const rs2::video_stream_profile& profile);
         void publish(stream_index_pair stream, const sensor_msgs::Image::ConstPtr& image, const sensor_msgs::CameraInfo::ConstPtr& info);
@@ -42,6 +41,7 @@ class PolledRealsenseNode : public BaseRealSenseNode
         std::condition_variable _frameset_condition;
         bool _is_streaming = false;
         bool _waiting_for_frames = false;
+        ros::Time _min_stamp = ros::Time(0);
         size_t _stream_num = 0;
         RawFramesPtr _frameset = {};
         FrameCallback _frame_callback;
@@ -63,6 +63,8 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
 {
     if (!tf_prefix.empty()) {
 
+        bool infra_rgb = _pnh.param("infra_rgb", false);
+
         std::string param_value;
         if (!_pnh.getParam("base_frame_id", param_value))
         {
@@ -79,13 +81,19 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
         for (auto& stream : streams)
         {
             std::string stream_name = _stream_name[stream.first] + (stream.second > 0 ? std::to_string(stream.second) : "");
+            std::string frame_name = stream_name;
+            if (infra_rgb && stream_name == "infra")
+            {
+                frame_name = "rgb";
+            }
+
             if (!_pnh.getParam(stream_name + "_frame_id", param_value))
             {
-                _pnh.setParam(stream_name + "_frame_id", tf_prefix + "_" + stream_name + "_frame");
+                _pnh.setParam(stream_name + "_frame_id", tf_prefix + "_" + frame_name + "_frame");
             }
             if (!_pnh.getParam(stream_name + "_optical_frame_id", param_value))
             {
-                _pnh.setParam(stream_name + "_optical_frame_id", tf_prefix + "_" + stream_name + "_optical_frame");
+                _pnh.setParam(stream_name + "_optical_frame_id", tf_prefix + "_" + frame_name + "_optical_frame");
             }
         }
 
@@ -114,7 +122,7 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
     return true;
 }
 
-RawFramesPtr PolledRealsenseNode::getFrames(int timeout_ms)
+RawFramesPtr PolledRealsenseNode::getFrames(int timeout_ms, const ros::Time& stamp)
 {
     if (_is_streaming)
     {
@@ -126,6 +134,7 @@ RawFramesPtr PolledRealsenseNode::getFrames(int timeout_ms)
     {
         std::lock_guard<std::mutex> lock(_frameset_mutex);
         _waiting_for_frames = true;
+        _min_stamp = stamp;
     }
 
     startStreams();
@@ -240,6 +249,13 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
 
     initializeTimeBase(frame);
 
+    if (_waiting_for_frames) {
+        ros::Time stamp(frameSystemTimeSec(frame));
+        if (stamp < _min_stamp) {
+            return;
+        }
+    }
+
     (*_frameset)[sip] = frame;
 
     // check if the frameset is complete
@@ -287,14 +303,16 @@ void CameraDriver::setCallback(FrameCallback callback)
     _frame_callback = callback;
 }
 
-FramesPtr CameraDriver::getFrames(double timeout)
+FramesPtr CameraDriver::getFrames(double timeout, ros::Time stamp)
 {
+    std::lock_guard<std::mutex> lock(_get_frames_mutex);
+
     if (!_camera)
     {
         return  {};
     }
 
-    auto raw_frames = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getFrames(timeout * 1000);
+    auto raw_frames = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getFrames(timeout * 1000, stamp);
     if (!raw_frames)
     {
         return {};
@@ -386,8 +404,8 @@ bool CameraDriver::initialize()
         return false;
     }
 
-    std::string tf_prefix_resolved = _pnh.resolveName("tf_prefix");
-    ROS_ERROR("tf_prefix: [%s]", tf_prefix.c_str());
+    std::string tf_prefix = _pnh.param("tf_prefix", std::string(""));
+    ROS_INFO("tf_prefix: [%s]", tf_prefix.c_str());
 
     auto camera = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera);
     if (!camera->initialize(tf_prefix))
@@ -532,31 +550,31 @@ void CameraDriver::copyFrames(const std::map<stream_index_pair, rs2::frame>& in,
             auto format = profile.format();
             if (format == RS2_FORMAT_BGR8) {
                 image->encoding = enc::BGR8;
-                image->step = sizeof(uint8_t) * 3;
+                image->step = profile.width() * sizeof(uint8_t) * 3;
             }
             else if (format == RS2_FORMAT_BGRA8) {
                 image->encoding = enc::BGRA8;
-                image->step = sizeof(uint8_t) * 4;
+                image->step = profile.width() * sizeof(uint8_t) * 4;
             }
             else if (format == RS2_FORMAT_RGB8) {
                 image->encoding = enc::RGB8;
-                image->step = sizeof(uint8_t) * 3;
+                image->step = profile.width() * sizeof(uint8_t) * 3;
             }
             else if (format == RS2_FORMAT_RGBA8) {
                 image->encoding = enc::RGBA8;
-                image->step = sizeof(uint8_t) * 4;
+                image->step = profile.width() * sizeof(uint8_t) * 4;
             }
             else if (format == RS2_FORMAT_Y8) {
                 image->encoding = enc::MONO8;
-                image->step = sizeof(uint8_t);
+                image->step = profile.width() * sizeof(uint8_t);
             }
             else if (format == RS2_FORMAT_Y16) {
                 image->encoding = enc::MONO16;
-                image->step = sizeof(uint16_t);
+                image->step = profile.width() * sizeof(uint16_t);
             }
             else if (format == RS2_FORMAT_Z16) {
                 image->encoding = enc::MONO16;
-                image->step = sizeof(uint16_t);
+                image->step = profile.width() * sizeof(uint16_t);
             }
             else {
                 ROS_WARN_THROTTLE(1.0, "Unsupported image format: %s", rs2_format_to_string(format));
@@ -583,7 +601,6 @@ void CameraDriver::copyFrames(const std::map<stream_index_pair, rs2::frame>& in,
 
         if (!image_data.info || image_data.info->width != image->width || image_data.info->height != image->height)
         {
-            ROS_INFO("Getting camera info ...");
             image_data.info = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->updateCameraInfo(profile);
             if (image_data.info)
             {
