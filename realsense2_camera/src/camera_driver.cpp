@@ -289,12 +289,14 @@ std::string CameraDriver::getSerialNo() const
 void CameraDriver::reset()
 {
     _camera = {};
-    try {
-        _device.hardware_reset();
-        _device = rs2::device();
-    }
-    catch(const std::exception& ex) {
-        ROS_ERROR("An exception has been thrown trying reset device <%s>: %s", _serial_no.c_str(), ex.what());
+    if (_device) {
+        try {
+            _device.hardware_reset();
+            _device = rs2::device();
+        }
+        catch(const std::exception& ex) {
+            ROS_ERROR("An exception has been thrown trying reset device <%s>: %s", _serial_no.c_str(), ex.what());
+        }
     }
 }
 
