@@ -61,9 +61,8 @@ PolledRealsenseNode::~PolledRealsenseNode()
 
 bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
 {
+    bool infra_rgb = _pnh.param("infra_rgb", false);
     if (!tf_prefix.empty()) {
-
-        bool infra_rgb = _pnh.param("infra_rgb", false);
 
         std::string param_value;
         if (!_pnh.getParam("base_frame_id", param_value))
@@ -105,7 +104,55 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
         }
     }
 
+    // disable tf
+    _publish_tf = false;
+
+    // initialize everything
     publishTopics();
+
+    // calculate static transforms
+    rs2::stream_profile base_profile = getAProfile(_base_stream);
+    for (const auto& stream : _enable)
+    {
+        if (stream.second)
+        {
+            calcAndPublishStaticTransform(stream.first, base_profile);
+        }
+    }
+
+    bool override_rgb_transforms = _pnh.param("override_rgb_transforms", false);
+    if (override_rgb_transforms) {
+        // get relevant frames
+        std::string rgb_frame = _frame_id[COLOR];
+        std::string rgb_optical_frame = _optical_frame_id[COLOR];
+        if (infra_rgb)
+        {
+            rgb_frame = _frame_id[INFRA0];
+            rgb_optical_frame = _optical_frame_id[INFRA0];
+        }
+
+        // remove current rgb frames
+        std::vector<geometry_msgs::TransformStamped> transforms;
+        for (const auto& transform: _static_tf_msgs)
+        {
+            if (transform.child_frame_id != rgb_frame && transform.child_frame_id != rgb_frame)
+            {
+                transforms.push_back(transform);
+            }
+        }
+
+        _static_tf_msgs = transforms;
+    }
+
+    // publish transforms
+    if (_tf_publish_rate > 0)
+    {
+        _tf_t = std::shared_ptr<std::thread>(new std::thread(boost::bind(&PolledRealsenseNode::publishDynamicTransforms, this)));
+    }
+    else
+    {
+        _static_tf_broadcaster.sendTransform(_static_tf_msgs);
+    }
 
     _stream_num = _enabled_profiles.size();
     for (const auto& profile : _enabled_profiles)
@@ -589,6 +636,16 @@ void CameraDriver::copyFrames(const std::map<stream_index_pair, rs2::frame>& in,
         ros::Time stamp(_camera->frameSystemTimeSec(frame.second));
 
         auto& image_data = out[sip];
+
+        image_data.profile_fps = profile.fps();
+        if (frame.second.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS)) {
+            image_data.actual_fps = static_cast<int>(frame.second.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS));
+        }
+
+        if (frame.second.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE)) {
+            image_data.actual_exposure = static_cast<int>(frame.second.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+        }
+
         auto image = image_data.image;
         image->width = profile.width();
         image->height = profile.height();

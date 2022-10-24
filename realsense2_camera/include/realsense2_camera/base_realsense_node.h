@@ -166,6 +166,11 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::string> _depth_aligned_frame_id;
         ros::NodeHandle _node_handle, _pnh;
         bool _align_depth;
+        bool _publish_tf;
+        double _tf_publish_rate;
+        std::shared_ptr<std::thread> _tf_t;
+        tf2_ros::StaticTransformBroadcaster _static_tf_broadcaster;
+        std::vector<geometry_msgs::TransformStamped> _static_tf_msgs;
         std::vector<rs2_option> _monitor_options;
         std::shared_ptr<ros::ServiceServer> _device_info_srv;
         rs2::device _dev;
@@ -176,6 +181,8 @@ namespace realsense2_camera
         std::map<stream_index_pair, ros::Publisher> _info_publisher;
         std::map<stream_index_pair, sensor_msgs::CameraInfo> _camera_info;
         std::map<rs2_stream, std::string> _stream_name;
+        std::map<stream_index_pair, bool> _enable;
+        stream_index_pair _base_stream;
 
         virtual void frame_callback(rs2::frame frame);
         virtual void calcAndPublishStaticTransform(const stream_index_pair& stream, const rs2::stream_profile& base_profile);
@@ -190,6 +197,7 @@ namespace realsense2_camera
                                const std::string& to);
         void updateStreamCalibData(const rs2::video_stream_profile& video_profile);
         void initializeTimeBase(rs2::frame frame);
+        void publishDynamicTransforms();
 
     private:
         class CimuData
@@ -220,7 +228,6 @@ namespace realsense2_camera
         void clip_depth(rs2::depth_frame depth_frame, float clipping_dist);
         void SetBaseStream();
         void publishStaticTransforms();
-        void publishDynamicTransforms();
         void publishIntrinsics();
         void runFirstFrameInitialization(rs2_stream stream_type);
         void publishPointCloud(rs2::points f, const ros::Time& t, const rs2::frameset& frameset);
@@ -283,13 +290,9 @@ namespace realsense2_camera
         std::map<stream_index_pair, int> _height;
         std::map<stream_index_pair, int> _fps;
         std::map<rs2_stream, int>        _format;
-        std::map<stream_index_pair, bool> _enable;
-        bool _publish_tf;
-        double _tf_publish_rate;
-        tf2_ros::StaticTransformBroadcaster _static_tf_broadcaster;
+
         tf2_ros::TransformBroadcaster _dynamic_tf_broadcaster;
-        std::vector<geometry_msgs::TransformStamped> _static_tf_msgs;
-        std::shared_ptr<std::thread> _tf_t, _update_functions_t;
+        std::shared_ptr<std::thread> _update_functions_t;
 
         std::map<stream_index_pair, ros::Publisher> _imu_publishers;
         std::shared_ptr<SyncedImuPublisher> _synced_imu_publisher;
@@ -335,7 +338,6 @@ namespace realsense2_camera
         std::vector<std::function<void()> > _update_functions_v;
         mutable std::condition_variable _cv_monitoring, _cv_tf, _update_functions_cv;
 
-        stream_index_pair _base_stream;
         const std::string _namespace;
 
         sensor_msgs::PointCloud2 _msg_pointcloud;

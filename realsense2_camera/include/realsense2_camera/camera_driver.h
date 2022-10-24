@@ -9,6 +9,9 @@
 namespace realsense2_camera{
 
 struct ImageData {
+    int32_t profile_fps = -1;
+    int32_t actual_fps = -1;
+    int64_t actual_exposure = -1;
     sensor_msgs::Image::Ptr image;
     sensor_msgs::CameraInfo::Ptr info;
 };
