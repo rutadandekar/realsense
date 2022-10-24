@@ -30,6 +30,8 @@ class PolledRealsenseNode : public BaseRealSenseNode
         sensor_msgs::CameraInfo::Ptr updateCameraInfo(const rs2::video_stream_profile& profile);
         void publish(stream_index_pair stream, const sensor_msgs::Image::ConstPtr& image, const sensor_msgs::CameraInfo::ConstPtr& info);
 
+        double getStamp(rs2::frame frame);
+
         void stopStreams();
         void startStreams();
 
@@ -251,6 +253,11 @@ void PolledRealsenseNode::publish(stream_index_pair stream, const sensor_msgs::I
     }
 }
 
+double PolledRealsenseNode::getStamp(rs2::frame frame)
+{
+    return frameSystemTimeSec(frame);
+}
+
 void PolledRealsenseNode::stopStreams()
 {
     if (_is_streaming)
@@ -294,7 +301,11 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
     auto stream_index = frame.get_profile().stream_index();
     stream_index_pair sip{stream_type,stream_index};
 
-    initializeTimeBase(frame);
+    bool placeholder_false(false);
+    if (_is_initialized_time_base.compare_exchange_strong(placeholder_false, true) )
+    {
+        _is_initialized_time_base = setBaseTime(frame.get_timestamp(), frame.get_frame_timestamp_domain());
+    }
 
     if (_waiting_for_frames) {
         ros::Time stamp(frameSystemTimeSec(frame));
@@ -633,7 +644,7 @@ void CameraDriver::copyFrames(const std::map<stream_index_pair, rs2::frame>& in,
             out[sip].image = image;
         }
 
-        ros::Time stamp(_camera->frameSystemTimeSec(frame.second));
+        ros::Time stamp(std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getStamp(frame.second));
 
         auto& image_data = out[sip];
 
