@@ -28,6 +28,7 @@ class PolledRealsenseNode : public BaseRealSenseNode
         RawFramesPtr getFrames(int timeout_ms, const ros::Time& stamp);
         void setCallback(FrameCallback callback);
         sensor_msgs::CameraInfo::Ptr updateCameraInfo(const rs2::video_stream_profile& profile);
+        void applyFilters(std::map<stream_index_pair, rs2::frame>& frames);
         void publish(stream_index_pair stream, const sensor_msgs::Image::ConstPtr& image, const sensor_msgs::CameraInfo::ConstPtr& info);
 
         double getStamp(rs2::frame frame);
@@ -301,10 +302,22 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
     auto stream_index = frame.get_profile().stream_index();
     stream_index_pair sip{stream_type,stream_index};
 
+    // initialize time base
     bool placeholder_false(false);
     if (_is_initialized_time_base.compare_exchange_strong(placeholder_false, true) )
     {
         _is_initialized_time_base = setBaseTime(frame.get_timestamp(), frame.get_frame_timestamp_domain());
+    }
+
+    // run first frame initialization
+    if (frame.is<rs2::frameset>()) {
+        auto frameset = frame.as<rs2::frameset>();
+        for (auto it = frameset.begin(); it != frameset.end(); ++it) {
+            runFirstFrameInitialization((*it).get_profile().stream_type());
+        }
+    }
+    else if (frame.is<rs2::video_frame>()) {
+        runFirstFrameInitialization(frame.get_profile().stream_type());
     }
 
     if (_waiting_for_frames) {
@@ -316,8 +329,18 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
 
     (*_frameset)[sip] = frame;
 
+    size_t num_frames = 0;
+    for (const auto& frame: *_frameset) {
+        if (frame.second.is<rs2::frameset>()) {
+            num_frames += frame.second.as<rs2::frameset>().size();
+        }
+        else {
+            num_frames++;
+        }
+    }
+
     // check if the frameset is complete
-    if (_frameset->size() >= _stream_num) {
+    if (num_frames >= _stream_num) {
         if (_waiting_for_frames) {
             // notify condition
             _frameset_condition.notify_all();
@@ -328,6 +351,38 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
                 _frame_callback(_frameset);
             }
             _frameset = std::make_shared<RawFrames>();
+        }
+    }
+}
+
+void PolledRealsenseNode::applyFilters(std::map<stream_index_pair, rs2::frame>& frames) {
+    for (auto& frame: frames) {
+        if (frame.second.is<rs2::frameset>()) {
+            auto frameset = frame.second.as<rs2::frameset>();
+
+            // Clip depth_frame for max range:
+            rs2::depth_frame original_depth_frame = frameset.get_depth_frame();
+            bool is_color_frame(frameset.get_color_frame());
+            if (original_depth_frame && _clipping_distance > 0)
+            {
+                clip_depth(original_depth_frame, _clipping_distance);
+            }
+
+            ROS_DEBUG("num_filters: %d", static_cast<int>(_filters.size()));
+            for (std::vector<NamedFilter>::const_iterator filter_it = _filters.begin(); filter_it != _filters.end(); filter_it++)
+            {
+                ROS_DEBUG("Applying filter: %s", filter_it->_name.c_str());
+                if ((filter_it->_name == "pointcloud") && (!original_depth_frame))
+                    continue;
+                if ((filter_it->_name == "align_to_color") && (!is_color_frame))
+                    continue;
+                frameset = filter_it->_filter->process(frameset);
+            }
+
+            ROS_DEBUG("List of frameset after applying filters: size: %d", static_cast<int>(frameset.size()));
+        }
+        else if (frame.second.is<rs2::depth_frame>() && _clipping_distance > 0) {
+            clip_depth(frame.second, _clipping_distance);
         }
     }
 }
@@ -378,21 +433,40 @@ FramesPtr CameraDriver::getFrames(double timeout, ros::Time stamp)
         return {};
     }
 
-    auto buffer = _frame_buffer;
-    _frame_buffer = {};
+    return processFrames(*raw_frames);
+}
 
-    if (!buffer) {
-        buffer = std::make_shared<Frames>();
-    }
-    copyFrames(*raw_frames, *buffer);
-
-    auto camera = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera);
-    for (const auto& frame: *buffer)
+FramesPtr CameraDriver::getLatestFrames()
+{
+    std::shared_ptr<std::map<stream_index_pair, rs2::frame>> latest_frames;
     {
-        camera->publish(frame.first, frame.second.image, frame.second.info);
+        std::lock_guard<std::mutex> lock(_get_frames_mutex);
+        latest_frames = _latest_frames;
+        _latest_frames = {};
     }
 
-    return buffer;
+    if (!latest_frames)
+    {
+        return {};
+    }
+
+    return processFrames(*latest_frames);
+}
+
+ros::Time CameraDriver::getLatestStamp()
+{
+    std::lock_guard<std::mutex> lock(_get_frames_mutex);
+
+    if (!_camera) {
+        return ros::Time(0);
+    }
+
+    if (!_latest_frames || _latest_frames->empty())
+    {
+        return ros::Time(0);
+    }
+
+    return ros::Time(std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getStamp(_latest_frames->begin()->second));
 }
 
 void CameraDriver::setFrameBuffer(FramesPtr frame_buffer)
@@ -573,25 +647,42 @@ bool CameraDriver::create() {
 
 void CameraDriver::handleFrames(std::shared_ptr<std::map<stream_index_pair, rs2::frame>> frames)
 {
-    auto buffer = _frame_buffer;
-    _frame_buffer = {};
-    if (!buffer)
     {
-        buffer = std::make_shared<Frames>();
+        std::lock_guard<std::mutex> lock(_get_frames_mutex);
+        _latest_frames = frames;
     }
 
-    copyFrames(*frames, *buffer);
+    if (_frame_callback) {
+        _frame_callback();
+    }
+}
+
+FramesPtr CameraDriver::processFrames(std::map<stream_index_pair, rs2::frame>& frames)
+{
+    auto camera = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera);
+
+    // apply configured filters
+    camera->applyFilters(frames);
+
+    auto buffer = _frame_buffer;
+    _frame_buffer = {};
+
+    if (!buffer) {
+        buffer = std::make_shared<Frames>();
+    }
+    copyFrames(frames, *buffer);
 
     if (_frame_callback)
     {
-        _frame_callback(buffer);
+        _frame_callback();
     }
 
-    auto camera = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera);
     for (const auto& frame: *buffer)
     {
         camera->publish(frame.first, frame.second.image, frame.second.info);
     }
+
+    return buffer;
 }
 
 void CameraDriver::copyFrames(const std::map<stream_index_pair, rs2::frame>& in, Frames& out)

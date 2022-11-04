@@ -24,7 +24,7 @@ class CameraDriver
 {
     public:
         using Ptr = std::shared_ptr<CameraDriver>;
-        using FrameCallback = std::function<void(const FramesPtr&)>;
+        using FrameCallback = std::function<void()>;
 
         ~CameraDriver() = default;
 
@@ -33,6 +33,8 @@ class CameraDriver
         void reset();
         void setCallback(FrameCallback callback);
         FramesPtr getFrames(double timeout, ros::Time stamp = ros::Time(0));
+        FramesPtr getLatestFrames();
+        ros::Time getLatestStamp();
         void setFrameBuffer(FramesPtr frame_buffer);
         void start();
         void stop();
@@ -57,6 +59,8 @@ class CameraDriver
         std::mutex _get_frames_mutex;
         FramesPtr _frame_buffer;
 
+        std::shared_ptr<std::map<stream_index_pair, rs2::frame>> _latest_frames;
+
         size_t _corrupted_frames = 0;
         size_t _hardware_errors = 0;
         size_t _hardware_events = 0;
@@ -67,6 +71,7 @@ class CameraDriver
         bool create();
         void handleFrames(std::shared_ptr<std::map<stream_index_pair, rs2::frame>> frames);
         void copyFrames(const std::map<stream_index_pair, rs2::frame>& in, Frames& out);
+        FramesPtr processFrames(std::map<stream_index_pair, rs2::frame>& frames);
 };
 
 }  // namespace realsense2_camera
