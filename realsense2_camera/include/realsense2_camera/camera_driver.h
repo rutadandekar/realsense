@@ -12,6 +12,7 @@ struct ImageData {
     int32_t profile_fps = -1;
     int32_t actual_fps = -1;
     int64_t actual_exposure = -1;
+    int64_t transfer_bytes = -1;
     sensor_msgs::Image::Ptr image;
     sensor_msgs::CameraInfo::Ptr info;
 };
@@ -60,6 +61,7 @@ class CameraDriver
         FramesPtr _frame_buffer;
 
         std::shared_ptr<std::map<stream_index_pair, rs2::frame>> _latest_frames;
+        FramesPtr _latest_processed_frames;
 
         size_t _corrupted_frames = 0;
         size_t _hardware_errors = 0;
@@ -70,7 +72,8 @@ class CameraDriver
         CameraDriver(ros::NodeHandle nh, ros::NodeHandle pnh, const std::string& serial_no);
         bool create();
         void handleFrames(std::shared_ptr<std::map<stream_index_pair, rs2::frame>> frames);
-        void copyFrames(const std::map<stream_index_pair, rs2::frame>& in, Frames& out);
+        void copyFrame(rs2::frame frame, ImageData& image) const;
+        bool isColor(rs2::stream_profile profile) const;
         FramesPtr processFrames(std::map<stream_index_pair, rs2::frame>& frames);
 };
 

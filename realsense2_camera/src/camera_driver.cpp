@@ -111,7 +111,20 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
     _publish_tf = false;
 
     // initialize everything
-    publishTopics();
+    try
+    {
+        publishTopics();
+    }
+    catch(const std::exception& ex)
+    {
+        ROS_ERROR_STREAM("An exception has been thrown: " << ex.what());
+        return false;
+    }
+    catch(...)
+    {
+        ROS_ERROR_STREAM("Unknown exception has occured!");
+        return false;
+    }
 
     // calculate static transforms
     rs2::stream_profile base_profile = getAProfile(_base_stream);
@@ -438,19 +451,18 @@ FramesPtr CameraDriver::getFrames(double timeout, ros::Time stamp)
 
 FramesPtr CameraDriver::getLatestFrames()
 {
-    std::shared_ptr<std::map<stream_index_pair, rs2::frame>> latest_frames;
+    std::lock_guard<std::mutex> lock(_get_frames_mutex);
+    if (_latest_processed_frames)
     {
-        std::lock_guard<std::mutex> lock(_get_frames_mutex);
-        latest_frames = _latest_frames;
-        _latest_frames = {};
+        return _latest_processed_frames;
     }
-
-    if (!latest_frames)
+    else if (!_latest_frames)
     {
         return {};
     }
 
-    return processFrames(*latest_frames);
+    _latest_processed_frames = processFrames(*_latest_frames);
+    return _latest_processed_frames;
 }
 
 ros::Time CameraDriver::getLatestStamp()
@@ -650,6 +662,7 @@ void CameraDriver::handleFrames(std::shared_ptr<std::map<stream_index_pair, rs2:
     {
         std::lock_guard<std::mutex> lock(_get_frames_mutex);
         _latest_frames = frames;
+        _latest_processed_frames = {};
     }
 
     if (_frame_callback) {
@@ -661,112 +674,157 @@ FramesPtr CameraDriver::processFrames(std::map<stream_index_pair, rs2::frame>& f
 {
     auto camera = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera);
 
-    // apply configured filters
-    camera->applyFilters(frames);
-
     auto buffer = _frame_buffer;
     _frame_buffer = {};
 
     if (!buffer) {
         buffer = std::make_shared<Frames>();
     }
-    copyFrames(frames, *buffer);
 
-    if (_frame_callback)
-    {
+    // get frame sizes before filtering
+    for (const auto& frame: frames) {
+        if (frame.second.is<rs2::frameset>()) {
+            auto frameset = frame.second.as<rs2::frameset>();
+            for (auto it = frameset.begin(); it != frameset.end(); ++it) {
+                auto profile = (*it).get_profile();
+                auto stream_type = profile.stream_type();
+                auto stream_index = profile.stream_index();
+                stream_index_pair sip{ stream_type, stream_index };
+                (*buffer)[sip].transfer_bytes = (*it).get_data_size();
+                if (isColor(profile)) {
+                    (*buffer)[sip].transfer_bytes *= 0.666666;  // Transfered compressed using YUYV
+                }
+            }
+        }
+        else {
+            auto profile = frame.second.get_profile();
+            auto stream_type = profile.stream_type();
+            auto stream_index = profile.stream_index();
+            stream_index_pair sip{ stream_type, stream_index };
+            (*buffer)[sip].transfer_bytes = frame.second.get_data_size();
+            if (isColor(profile)) {
+                (*buffer)[sip].transfer_bytes *= 0.666666;  // Transfered compressed using YUYV
+            }
+        }
+    }
+
+    // apply configured filters
+    camera->applyFilters(frames);
+
+    // copy frames
+    for (const auto& frame: frames) {
+        if (frame.second.is<rs2::frameset>()) {
+            auto frameset = frame.second.as<rs2::frameset>();
+            for (auto it = frameset.begin(); it != frameset.end(); ++it) {
+                auto profile = (*it).get_profile();
+                auto stream_type = profile.stream_type();
+                auto stream_index = profile.stream_index();
+                stream_index_pair sip{ stream_type, stream_index };
+                copyFrame((*it), (*buffer)[sip]);
+            }
+        }
+        else {
+            auto profile = frame.second.get_profile();
+            auto stream_type = profile.stream_type();
+            auto stream_index = profile.stream_index();
+            stream_index_pair sip{ stream_type, stream_index };
+            copyFrame(frame.second, (*buffer)[sip]);
+        }
+    }
+
+    if (_frame_callback) {
         _frame_callback();
     }
 
-    for (const auto& frame: *buffer)
-    {
+    for (const auto& frame: *buffer) {
         camera->publish(frame.first, frame.second.image, frame.second.info);
     }
 
     return buffer;
 }
 
-void CameraDriver::copyFrames(const std::map<stream_index_pair, rs2::frame>& in, Frames& out)
-{
-    for (const auto& frame: in)
+bool CameraDriver::isColor(rs2::stream_profile profile) const {
+    if (profile.is<rs2::video_stream_profile>()) {
+        auto format = profile.as<rs2::video_stream_profile>().format();
+        if (format == RS2_FORMAT_RGB8 || format == RS2_FORMAT_BGR8) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void CameraDriver::copyFrame(rs2::frame frame, ImageData& image_data) const {
+    auto profile = frame.get_profile().as<rs2::video_stream_profile>();
+    auto stream_type = profile.stream_type();
+    auto stream_index = profile.stream_index();
+    stream_index_pair sip{ stream_type, stream_index };
+    if (!image_data.image) {
+        image_data.image = boost::make_shared<sensor_msgs::Image>();
+        auto format = profile.format();
+        if (format == RS2_FORMAT_BGR8) {
+            image_data.image->encoding = enc::BGR8;
+            image_data.image->step = profile.width() * sizeof(uint8_t) * 3;
+        }
+        else if (format == RS2_FORMAT_BGRA8) {
+            image_data.image->encoding = enc::BGRA8;
+            image_data.image->step = profile.width() * sizeof(uint8_t) * 4;
+        }
+        else if (format == RS2_FORMAT_RGB8) {
+            image_data.image->encoding = enc::RGB8;
+            image_data.image->step = profile.width() * sizeof(uint8_t) * 3;
+        }
+        else if (format == RS2_FORMAT_RGBA8) {
+            image_data.image->encoding = enc::RGBA8;
+            image_data.image->step = profile.width() * sizeof(uint8_t) * 4;
+        }
+        else if (format == RS2_FORMAT_Y8) {
+            image_data.image->encoding = enc::MONO8;
+            image_data.image->step = profile.width() * sizeof(uint8_t);
+        }
+        else if (format == RS2_FORMAT_Y16) {
+            image_data.image->encoding = enc::MONO16;
+            image_data.image->step = profile.width() * sizeof(uint16_t);
+        }
+        else if (format == RS2_FORMAT_Z16) {
+            image_data.image->encoding = enc::MONO16;
+            image_data.image->step = profile.width() * sizeof(uint16_t);
+        }
+        else {
+            ROS_WARN_THROTTLE(1.0, "Unsupported image format: %s", rs2_format_to_string(format));
+            image_data.image = {};
+        }
+    }
+
+    ros::Time stamp(std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getStamp(frame));
+
+    image_data.profile_fps = profile.fps();
+    if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS)) {
+        image_data.actual_fps = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS));
+    }
+
+    if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE)) {
+        image_data.actual_exposure = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+    }
+
+    auto image = image_data.image;
+    image->width = profile.width();
+    image->height = profile.height();
+    image->header.stamp = stamp;
+
+    size_t num_bytes = frame.get_data_size();
+    if (image->data.size() != num_bytes)
     {
-        auto profile = frame.second.get_profile().as<rs2::video_stream_profile>();
-        auto stream_type = profile.stream_type();
-        auto stream_index = profile.stream_index();
-        stream_index_pair sip{ stream_type, stream_index };
+        image->data.resize(num_bytes);
+    }
+    std::memcpy(&(image->data[0]), frame.get_data(), num_bytes);
 
-        auto out_it = out.find(sip);
-        if (out_it == out.end() || !out_it->second.image)
+    if (!image_data.info || image_data.info->width != image->width || image_data.info->height != image->height)
+    {
+        image_data.info = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->updateCameraInfo(profile);
+        if (image_data.info)
         {
-            auto image = boost::make_shared<sensor_msgs::Image>();
-            auto format = profile.format();
-            if (format == RS2_FORMAT_BGR8) {
-                image->encoding = enc::BGR8;
-                image->step = profile.width() * sizeof(uint8_t) * 3;
-            }
-            else if (format == RS2_FORMAT_BGRA8) {
-                image->encoding = enc::BGRA8;
-                image->step = profile.width() * sizeof(uint8_t) * 4;
-            }
-            else if (format == RS2_FORMAT_RGB8) {
-                image->encoding = enc::RGB8;
-                image->step = profile.width() * sizeof(uint8_t) * 3;
-            }
-            else if (format == RS2_FORMAT_RGBA8) {
-                image->encoding = enc::RGBA8;
-                image->step = profile.width() * sizeof(uint8_t) * 4;
-            }
-            else if (format == RS2_FORMAT_Y8) {
-                image->encoding = enc::MONO8;
-                image->step = profile.width() * sizeof(uint8_t);
-            }
-            else if (format == RS2_FORMAT_Y16) {
-                image->encoding = enc::MONO16;
-                image->step = profile.width() * sizeof(uint16_t);
-            }
-            else if (format == RS2_FORMAT_Z16) {
-                image->encoding = enc::MONO16;
-                image->step = profile.width() * sizeof(uint16_t);
-            }
-            else {
-                ROS_WARN_THROTTLE(1.0, "Unsupported image format: %s", rs2_format_to_string(format));
-                continue;
-            }
-
-            out[sip].image = image;
-        }
-
-        ros::Time stamp(std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getStamp(frame.second));
-
-        auto& image_data = out[sip];
-
-        image_data.profile_fps = profile.fps();
-        if (frame.second.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS)) {
-            image_data.actual_fps = static_cast<int>(frame.second.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS));
-        }
-
-        if (frame.second.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE)) {
-            image_data.actual_exposure = static_cast<int>(frame.second.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
-        }
-
-        auto image = image_data.image;
-        image->width = profile.width();
-        image->height = profile.height();
-        image->header.stamp = stamp;
-
-        size_t num_bytes = frame.second.get_data_size();
-        if (image->data.size() != num_bytes)
-        {
-            image->data.resize(num_bytes);
-        }
-        std::memcpy(&(image->data[0]), frame.second.get_data(), num_bytes);
-
-        if (!image_data.info || image_data.info->width != image->width || image_data.info->height != image->height)
-        {
-            image_data.info = std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->updateCameraInfo(profile);
-            if (image_data.info)
-            {
-                image_data.info->header.stamp = stamp;
-            }
+            image_data.info->header.stamp = stamp;
         }
     }
 }
