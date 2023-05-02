@@ -102,6 +102,7 @@ add_library(${PROJECT_NAME}
     src/realsense_node_factory.cpp
     src/base_realsense_node.cpp
     src/t265_realsense_node.cpp
+    src/camera_driver.cpp
     )
 
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_generate_messages_cpp)
@@ -133,7 +134,7 @@ install(TARGETS ${PROJECT_NAME}
     )
 
 # Install header files
-install(DIRECTORY include/
+install(DIRECTORY include/realsense2_camera/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
     )
 

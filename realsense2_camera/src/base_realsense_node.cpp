@@ -1,4 +1,4 @@
-#include "../include/base_realsense_node.h"
+#include <realsense2_camera/base_realsense_node.h>
 #include "assert.h"
 #include <boost/algorithm/string.hpp>
 #include <algorithm>
@@ -1729,6 +1729,19 @@ void BaseRealSenseNode::setBaseTime(double frame_time, bool warn_no_metadata)
 
     _ros_time_base = ros::Time::now();
     _camera_time_base = frame_time;
+}
+
+double BaseRealSenseNode::frameSystemTimeSec(rs2::frame frame)
+{
+    if (frame.get_frame_timestamp_domain() == RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK)
+    {
+        double elapsed_camera_ms = (/*ms*/ frame.get_timestamp() - /*ms*/ _camera_time_base) / 1000.0;
+        return (_ros_time_base.toSec() + elapsed_camera_ms);
+    }
+    else
+    {
+        return (frame.get_timestamp() / 1000.0);
+    }
 }
 
 void BaseRealSenseNode::setupStreams()

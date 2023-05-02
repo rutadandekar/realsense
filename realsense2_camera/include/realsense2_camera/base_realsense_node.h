@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "../include/realsense_node_factory.h"
+#include <realsense2_camera/realsense_node_factory.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 
 #include <diagnostic_updater/diagnostic_updater.h>
@@ -160,7 +160,7 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::string> _frame_id;
         std::map<stream_index_pair, std::string> _optical_frame_id;
         std::map<stream_index_pair, std::string> _depth_aligned_frame_id;
-        ros::NodeHandle& _node_handle, _pnh;
+        ros::NodeHandle _node_handle, _pnh;
         bool _align_depth;
         std::vector<rs2_option> _monitor_options;
 
@@ -199,6 +199,7 @@ namespace realsense2_camera
         void setupFilters();
         void setupStreams();
         void setBaseTime(double frame_time, bool warn_no_metadata);
+        double frameSystemTimeSec(rs2::frame frame);
         cv::Mat& fix_depth_scale(const cv::Mat& from_image, cv::Mat& to_image);
         void clip_depth(rs2::depth_frame depth_frame, float clipping_dist);
         void updateStreamCalibData(const rs2::video_stream_profile& video_profile);
@@ -234,7 +235,7 @@ namespace realsense2_camera
         void imu_callback_sync(rs2::frame frame, imu_sync_method sync_method=imu_sync_method::COPY);
         void pose_callback(rs2::frame frame);
         void multiple_message_callback(rs2::frame frame, imu_sync_method sync_method);
-        void frame_callback(rs2::frame frame);
+        virtual void frame_callback(rs2::frame frame);
         void registerDynamicOption(ros::NodeHandle& nh, rs2::options sensor, std::string& module_name);
         void readAndSetDynamicParam(ros::NodeHandle& nh1, std::shared_ptr<ddynamic_reconfigure::DDynamicReconfigure> ddynrec, const std::string option_name, const int min_val, const int max_val, rs2::sensor sensor, int* option_value);
         void registerAutoExposureROIOptions(ros::NodeHandle& nh);
