@@ -26,6 +26,7 @@ class PolledRealsenseNode : public BaseRealSenseNode
 
         bool initialize(const std::string& tf_prefix);
         RawFramesPtr getFrames(int timeout_ms, const ros::Time& stamp);
+        RawFramesPtr populateFrames(int timeout_ms);
         void setCallback(FrameCallback callback);
         sensor_msgs::CameraInfo::Ptr updateCameraInfo(const rs2::video_stream_profile& profile);
         void applyFilters(std::map<stream_index_pair, rs2::frame>& frames);
@@ -65,7 +66,8 @@ PolledRealsenseNode::~PolledRealsenseNode()
 bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
 {
     bool infra_rgb = _pnh.param("infra_rgb", false);
-    if (!tf_prefix.empty()) {
+    if (!tf_prefix.empty()) 
+    {
 
         std::string param_value;
         if (!_pnh.getParam("base_frame_id", param_value))
@@ -137,7 +139,8 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
     }
 
     bool override_rgb_transforms = _pnh.param("override_rgb_transforms", false);
-    if (override_rgb_transforms) {
+    if (override_rgb_transforms) 
+    {
         // get relevant frames
         std::string rgb_frame = _frame_id[COLOR];
         std::string rgb_optical_frame = _optical_frame_id[COLOR];
@@ -153,7 +156,7 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
         {
             if (transform.child_frame_id != rgb_frame && transform.child_frame_id != rgb_frame)
             {
-                transforms.push_back(transform);
+                transforms.emplace_back(transform);
             }
         }
 
@@ -163,7 +166,7 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
     // publish transforms
     if (_tf_publish_rate > 0)
     {
-        _tf_t = std::shared_ptr<std::thread>(new std::thread(boost::bind(&PolledRealsenseNode::publishDynamicTransforms, this)));
+        _tf_t = std::shared_ptr<std::thread>(new std::thread(std::bind(&PolledRealsenseNode::publishDynamicTransforms, this)));
     }
     else
     {
@@ -180,9 +183,34 @@ bool PolledRealsenseNode::initialize(const std::string& tf_prefix)
     _is_streaming = true;
     stopStreams();
 
-    // TODO fail on unsupported config
-
     return true;
+}
+
+RawFramesPtr PolledRealsenseNode::populateFrames(int timeout_ms)
+{
+    // wait up to the specified timeout for notification that the frameset has
+    // been populated
+    RawFramesPtr frames;
+    auto now = std::chrono::system_clock::now();
+    auto timeout = now + std::chrono::milliseconds(timeout_ms);
+    std::unique_lock<std::mutex> lock(_frameset_mutex);
+    if(_frameset_condition.wait_until(lock, timeout, [this](){
+        return _frameset && _frameset->size() >= _stream_num;
+    }))
+    {
+        // copy a reference to the class level frameset
+        frames = _frameset;
+    }
+    else 
+    {
+        ROS_WARN("Timed out waiting for frame data.  Timeout: %dms", timeout_ms);
+    }
+
+    // clear the class level frameset
+    _frameset = std::make_shared<RawFrames>();
+    lock.unlock();
+
+    return frames;
 }
 
 RawFramesPtr PolledRealsenseNode::getFrames(int timeout_ms, const ros::Time& stamp)
@@ -202,26 +230,7 @@ RawFramesPtr PolledRealsenseNode::getFrames(int timeout_ms, const ros::Time& sta
 
     startStreams();
 
-    // wait up to the specified timeout for notification that the frameset has
-    // been populated
-    RawFramesPtr frames;
-    auto now = std::chrono::system_clock::now();
-    auto timeout = now + std::chrono::milliseconds(timeout_ms);
-    std::unique_lock<std::mutex> lock(_frameset_mutex);
-    if(_frameset_condition.wait_until(lock, timeout, [this](){
-        return _frameset && _frameset->size() >= _stream_num;
-    }))
-    {
-        // copy a reference to the class level frameset
-        frames = _frameset;
-    }
-    else {
-        ROS_WARN("Timed out waiting for frame data.  Timeout: %dms", timeout_ms);
-    }
-
-    // clear the class level frameset
-    _frameset = std::make_shared<RawFrames>();
-    lock.unlock();
+    auto frames = populateFrames(timeout_ms);
 
     stopStreams();
 
@@ -307,7 +316,8 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
 {
     std::lock_guard<std::mutex> frame_lock(_frameset_mutex);
 
-    if (!_frameset) {
+    if (!_frameset) 
+    {
         _frameset = std::make_shared<RawFrames>();
     }
 
@@ -317,25 +327,30 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
 
     // initialize time base
     bool placeholder_false(false);
-    if (_is_initialized_time_base.compare_exchange_strong(placeholder_false, true) )
+    if (_is_initialized_time_base.compare_exchange_strong(placeholder_false, true))
     {
         _is_initialized_time_base = setBaseTime(frame.get_timestamp(), frame.get_frame_timestamp_domain());
     }
 
     // run first frame initialization
-    if (frame.is<rs2::frameset>()) {
+    if (frame.is<rs2::frameset>()) 
+    {
         auto frameset = frame.as<rs2::frameset>();
-        for (auto it = frameset.begin(); it != frameset.end(); ++it) {
+        for (auto it = frameset.begin(); it != frameset.end(); ++it) 
+        {
             runFirstFrameInitialization((*it).get_profile().stream_type());
         }
     }
-    else if (frame.is<rs2::video_frame>()) {
+    else if (frame.is<rs2::video_frame>()) 
+    {
         runFirstFrameInitialization(frame.get_profile().stream_type());
     }
 
-    if (_waiting_for_frames) {
+    if (_waiting_for_frames) 
+    {
         ros::Time stamp(frameSystemTimeSec(frame));
-        if (stamp < _min_stamp) {
+        if (stamp < _min_stamp) 
+        {
             return;
         }
     }
@@ -343,24 +358,31 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
     (*_frameset)[sip] = frame;
 
     size_t num_frames = 0;
-    for (const auto& frame: *_frameset) {
-        if (frame.second.is<rs2::frameset>()) {
+    for (const auto& frame: *_frameset) 
+    {
+        if (frame.second.is<rs2::frameset>()) 
+        {
             num_frames += frame.second.as<rs2::frameset>().size();
         }
-        else {
+        else 
+        {
             num_frames++;
         }
     }
 
     // check if the frameset is complete
-    if (num_frames >= _stream_num) {
-        if (_waiting_for_frames) {
+    if (num_frames >= _stream_num) 
+    {
+        if (_waiting_for_frames) 
+        {
             // notify condition
             _frameset_condition.notify_all();
         }
-        else {
+        else 
+        {
             // call aggregated callback
-            if (_frame_callback) {
+            if (_frame_callback) 
+            {
                 _frame_callback(_frameset);
             }
             _frameset = std::make_shared<RawFrames>();
@@ -368,9 +390,12 @@ void PolledRealsenseNode::frame_callback(rs2::frame frame)
     }
 }
 
-void PolledRealsenseNode::applyFilters(std::map<stream_index_pair, rs2::frame>& frames) {
-    for (auto& frame: frames) {
-        if (frame.second.is<rs2::frameset>()) {
+void PolledRealsenseNode::applyFilters(std::map<stream_index_pair, rs2::frame>& frames) 
+{
+    for (auto& frame: frames) 
+    {
+        if (frame.second.is<rs2::frameset>()) 
+        {
             auto frameset = frame.second.as<rs2::frameset>();
 
             // Clip depth_frame for max range:
@@ -394,7 +419,8 @@ void PolledRealsenseNode::applyFilters(std::map<stream_index_pair, rs2::frame>& 
 
             ROS_DEBUG("List of frameset after applying filters: size: %d", static_cast<int>(frameset.size()));
         }
-        else if (frame.second.is<rs2::depth_frame>() && _clipping_distance > 0) {
+        else if (frame.second.is<rs2::depth_frame>() && _clipping_distance > 0) 
+        {
             clip_depth(frame.second, _clipping_distance);
         }
     }
@@ -415,14 +441,18 @@ std::string CameraDriver::getSerialNo() const
 void CameraDriver::reset()
 {
     _camera = {};
-    if (_device) {
-        try {
+    if (_device) 
+    {
+        try 
+        {
             _device.hardware_reset();
-            _device = rs2::device();
         }
-        catch(const std::exception& ex) {
+        catch(const std::exception& ex) 
+        {
             ROS_ERROR("An exception has been thrown trying reset device <%s>: %s", _serial_no.c_str(), ex.what());
         }
+
+        _device = rs2::device();
     }
 }
 
@@ -469,7 +499,8 @@ ros::Time CameraDriver::getLatestStamp()
 {
     std::lock_guard<std::mutex> lock(_get_frames_mutex);
 
-    if (!_camera) {
+    if (!_camera) 
+    {
         return ros::Time(0);
     }
 
@@ -513,7 +544,7 @@ double CameraDriver::getProjectorTemperature() const
 
     // https://github.com/IntelRealSense/librealsense/issues/866#issuecomment-357461253
     auto dbg = _device.as<rs2::debug_protocol>();
-    std::vector<uint8_t> cmd = { 0x14, 0, 0xab, 0xcd, 0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    static const std::vector<uint8_t> cmd = { 0x14, 0, 0xab, 0xcd, 0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     auto res = dbg.send_and_receive_raw_data(cmd);
     return res[4];
 }
@@ -593,19 +624,23 @@ bool CameraDriver::initialize()
     return true;
 }
 
-bool CameraDriver::create() {
+bool CameraDriver::create() 
+{
     bool found = false;
     rs2::device dev;
 
     auto devices = _context.query_devices();
     ROS_DEBUG("Found %d device(s)", devices.size());
 
-    for (size_t i = 0; i < devices.size(); i++) {
+    for (size_t i = 0; i < devices.size(); i++) 
+    {
         rs2::device device;
-        try {
+        try 
+        {
             device = devices[i];
         }
-        catch(const std::exception& e) {
+        catch(const std::exception& e) 
+        {
             ROS_WARN("Device %zu of %d failed with exception: %s ", i + 1, devices.size(), e.what());
             continue;
         }
@@ -613,7 +648,8 @@ bool CameraDriver::create() {
         std::string sn = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         ROS_DEBUG("  Checking device: <%s>", sn.c_str());
 
-        if (_serial_no.empty() || _serial_no == sn) {
+        if (_serial_no.empty() || _serial_no == sn) 
+        {
             _serial_no = sn;
             dev = device;
             found = true;
@@ -622,8 +658,10 @@ bool CameraDriver::create() {
         }
     }
 
-    if (found) {
-        try {
+    if (found) 
+    {
+        try
+         {
             std::string firmware_version = dev.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION);
             std::string model = dev.get_info(RS2_CAMERA_INFO_NAME);
             std::string physical_port = dev.get_info(RS2_CAMERA_INFO_PHYSICAL_PORT);
@@ -636,7 +674,8 @@ bool CameraDriver::create() {
 
             auto sensors = dev.query_sensors();
             ROS_INFO("Found %zu sensor modules", sensors.size());
-            for(const auto& sensor : sensors) {
+            for(const auto& sensor : sensors) 
+            {
                 std::string sensor_name = sensor.get_info(RS2_CAMERA_INFO_NAME);
                 auto profiles = sensor.get_stream_profiles();
                 ROS_INFO("  <%s> with %zu profiles", sensor_name.c_str(), profiles.size());
@@ -646,10 +685,12 @@ bool CameraDriver::create() {
             _camera = std::make_shared<PolledRealsenseNode>(_nh, _pnh, dev, _serial_no);
             return true;
         }
-        catch(const std::exception& ex) {
+        catch(const std::exception& ex) 
+        {
             ROS_ERROR("An exception has been thrown trying to access device <%s>: {%s}", _serial_no.c_str(), ex.what());
         }
-        catch(...) {
+        catch(...) 
+        {
             ROS_ERROR("Unknown exception has occured trying to access device <%s>!", _serial_no.c_str());
         }
     }
@@ -677,32 +718,39 @@ FramesPtr CameraDriver::processFrames(std::map<stream_index_pair, rs2::frame>& f
     auto buffer = _frame_buffer;
     _frame_buffer = {};
 
-    if (!buffer) {
+    if (!buffer) 
+    {
         buffer = std::make_shared<Frames>();
     }
 
     // get frame sizes before filtering
-    for (const auto& frame: frames) {
-        if (frame.second.is<rs2::frameset>()) {
+    for (const auto& frame: frames) 
+    {
+        if (frame.second.is<rs2::frameset>()) 
+        {
             auto frameset = frame.second.as<rs2::frameset>();
-            for (auto it = frameset.begin(); it != frameset.end(); ++it) {
+            for (auto it = frameset.begin(); it != frameset.end(); ++it) 
+            {
                 auto profile = (*it).get_profile();
                 auto stream_type = profile.stream_type();
                 auto stream_index = profile.stream_index();
                 stream_index_pair sip{ stream_type, stream_index };
                 (*buffer)[sip].transfer_bytes = (*it).get_data_size();
-                if (isColor(profile)) {
+                if (isColor(profile)) 
+                {
                     (*buffer)[sip].transfer_bytes *= 0.666666;  // Transfered compressed using YUYV
                 }
             }
         }
-        else {
+        else 
+        {
             auto profile = frame.second.get_profile();
             auto stream_type = profile.stream_type();
             auto stream_index = profile.stream_index();
             stream_index_pair sip{ stream_type, stream_index };
             (*buffer)[sip].transfer_bytes = frame.second.get_data_size();
-            if (isColor(profile)) {
+            if (isColor(profile)) 
+            {
                 (*buffer)[sip].transfer_bytes *= 0.666666;  // Transfered compressed using YUYV
             }
         }
@@ -712,10 +760,13 @@ FramesPtr CameraDriver::processFrames(std::map<stream_index_pair, rs2::frame>& f
     camera->applyFilters(frames);
 
     // copy frames
-    for (const auto& frame: frames) {
-        if (frame.second.is<rs2::frameset>()) {
+    for (const auto& frame: frames) 
+    {
+        if (frame.second.is<rs2::frameset>()) 
+        {
             auto frameset = frame.second.as<rs2::frameset>();
-            for (auto it = frameset.begin(); it != frameset.end(); ++it) {
+            for (auto it = frameset.begin(); it != frameset.end(); ++it) 
+            {
                 auto profile = (*it).get_profile();
                 auto stream_type = profile.stream_type();
                 auto stream_index = profile.stream_index();
@@ -723,7 +774,8 @@ FramesPtr CameraDriver::processFrames(std::map<stream_index_pair, rs2::frame>& f
                 copyFrame((*it), (*buffer)[sip]);
             }
         }
-        else {
+        else 
+        {
             auto profile = frame.second.get_profile();
             auto stream_type = profile.stream_type();
             auto stream_index = profile.stream_index();
@@ -732,21 +784,26 @@ FramesPtr CameraDriver::processFrames(std::map<stream_index_pair, rs2::frame>& f
         }
     }
 
-    if (_frame_callback) {
+    if (_frame_callback) 
+    {
         _frame_callback();
     }
 
-    for (const auto& frame: *buffer) {
+    for (const auto& frame: *buffer) 
+    {
         camera->publish(frame.first, frame.second.image, frame.second.info);
     }
 
     return buffer;
 }
 
-bool CameraDriver::isColor(rs2::stream_profile profile) const {
-    if (profile.is<rs2::video_stream_profile>()) {
+bool CameraDriver::isColor(rs2::stream_profile profile) const 
+{
+    if (profile.is<rs2::video_stream_profile>()) 
+    {
         auto format = profile.as<rs2::video_stream_profile>().format();
-        if (format == RS2_FORMAT_RGB8 || format == RS2_FORMAT_BGR8) {
+        if (format == RS2_FORMAT_RGB8 || format == RS2_FORMAT_BGR8) 
+        {
             return true;
         }
     }
@@ -754,43 +811,53 @@ bool CameraDriver::isColor(rs2::stream_profile profile) const {
     return false;
 }
 
-void CameraDriver::copyFrame(rs2::frame frame, ImageData& image_data) const {
+void CameraDriver::copyFrame(rs2::frame frame, ImageData& image_data) const 
+{
     auto profile = frame.get_profile().as<rs2::video_stream_profile>();
     auto stream_type = profile.stream_type();
     auto stream_index = profile.stream_index();
     stream_index_pair sip{ stream_type, stream_index };
-    if (!image_data.image) {
+    if (!image_data.image) 
+    {
         image_data.image = boost::make_shared<sensor_msgs::Image>();
         auto format = profile.format();
-        if (format == RS2_FORMAT_BGR8) {
+        if (format == RS2_FORMAT_BGR8) 
+        {
             image_data.image->encoding = enc::BGR8;
             image_data.image->step = profile.width() * sizeof(uint8_t) * 3;
         }
-        else if (format == RS2_FORMAT_BGRA8) {
+        else if (format == RS2_FORMAT_BGRA8) 
+        {
             image_data.image->encoding = enc::BGRA8;
             image_data.image->step = profile.width() * sizeof(uint8_t) * 4;
         }
-        else if (format == RS2_FORMAT_RGB8) {
+        else if (format == RS2_FORMAT_RGB8) 
+        {
             image_data.image->encoding = enc::RGB8;
             image_data.image->step = profile.width() * sizeof(uint8_t) * 3;
         }
-        else if (format == RS2_FORMAT_RGBA8) {
+        else if (format == RS2_FORMAT_RGBA8) 
+        {
             image_data.image->encoding = enc::RGBA8;
             image_data.image->step = profile.width() * sizeof(uint8_t) * 4;
         }
-        else if (format == RS2_FORMAT_Y8) {
+        else if (format == RS2_FORMAT_Y8) 
+        {
             image_data.image->encoding = enc::MONO8;
             image_data.image->step = profile.width() * sizeof(uint8_t);
         }
-        else if (format == RS2_FORMAT_Y16) {
+        else if (format == RS2_FORMAT_Y16) 
+        {
             image_data.image->encoding = enc::MONO16;
             image_data.image->step = profile.width() * sizeof(uint16_t);
         }
-        else if (format == RS2_FORMAT_Z16) {
+        else if (format == RS2_FORMAT_Z16) 
+        {
             image_data.image->encoding = enc::MONO16;
             image_data.image->step = profile.width() * sizeof(uint16_t);
         }
-        else {
+        else 
+        {
             ROS_WARN_THROTTLE(1.0, "Unsupported image format: %s", rs2_format_to_string(format));
             image_data.image = {};
         }
@@ -799,11 +866,13 @@ void CameraDriver::copyFrame(rs2::frame frame, ImageData& image_data) const {
     ros::Time stamp(std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->getStamp(frame));
 
     image_data.profile_fps = profile.fps();
-    if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS)) {
+    if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS)) 
+    {
         image_data.actual_fps = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS));
     }
 
-    if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE)) {
+    if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE)) 
+    {
         image_data.actual_exposure = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
     }
 
@@ -832,7 +901,8 @@ void CameraDriver::copyFrame(rs2::frame frame, ImageData& image_data) const {
 CameraDriver::Ptr CameraDriver::find(ros::NodeHandle nh, ros::NodeHandle pnh, const std::string& serial_no)
 {
     auto driver = std::shared_ptr<CameraDriver>(new CameraDriver(nh, pnh, serial_no));
-    if (driver->create()) {
+    if (driver->create()) 
+    {
         return driver;
     }
 
