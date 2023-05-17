@@ -544,8 +544,7 @@ double CameraDriver::getProjectorTemperature() const
 
     // https://github.com/IntelRealSense/librealsense/issues/866#issuecomment-357461253
     auto dbg = _device.as<rs2::debug_protocol>();
-    static const std::vector<uint8_t> cmd = { 0x14, 0, 0xab, 0xcd, 0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    auto res = dbg.send_and_receive_raw_data(cmd);
+    auto res = dbg.send_and_receive_raw_data(GET_PROJECTOR_TEMP_CMD);
     return res[4];
 }
 

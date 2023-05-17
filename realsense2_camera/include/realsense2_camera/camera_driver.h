@@ -75,6 +75,8 @@ class CameraDriver
         void copyFrame(rs2::frame frame, ImageData& image) const;
         bool isColor(rs2::stream_profile profile) const;
         FramesPtr processFrames(std::map<stream_index_pair, rs2::frame>& frames);
+
+        const std::vector<uint8_t> GET_PROJECTOR_TEMP_CMD = { 0x14, 0, 0xab, 0xcd, 0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 };
 
 }  // namespace realsense2_camera
