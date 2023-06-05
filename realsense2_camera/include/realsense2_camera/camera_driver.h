@@ -37,6 +37,7 @@ class CameraDriver
         FramesPtr getLatestFrames();
         ros::Time getLatestStamp();
         void setFrameBuffer(FramesPtr frame_buffer);
+        void toggleSensors(bool enabled);
         void start();
         void stop();
         double getProjectorTemperature() const;
@@ -77,6 +78,8 @@ class CameraDriver
         FramesPtr processFrames(std::map<stream_index_pair, rs2::frame>& frames);
 
         const std::vector<uint8_t> GET_PROJECTOR_TEMP_CMD = { 0x14, 0, 0xab, 0xcd, 0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+        bool sensor_enabled_ = true;
 };
 
 }  // namespace realsense2_camera

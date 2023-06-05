@@ -517,6 +517,34 @@ void CameraDriver::setFrameBuffer(FramesPtr frame_buffer)
     _frame_buffer = frame_buffer;
 }
 
+void CameraDriver::toggleSensors(bool enabled)
+{
+    ROS_ERROR_STREAM("Inside CameraDriver::toggleSensors");
+    if (!_camera)
+    {
+        return;
+    }
+
+    if (sensor_enabled_ == enabled)
+    {
+        ROS_ERROR_STREAM("Already " << sensor_enabled_ ? "enabled":"disabled");
+        return;
+    }
+
+    if (enabled)
+    {
+        ROS_ERROR_STREAM("Starting camera");
+        std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->toggleSensors(enabled);
+        ros::Duration(5.0).sleep();
+    }
+    else
+    {
+        ROS_ERROR_STREAM("Stoping camera");
+        std::dynamic_pointer_cast<PolledRealsenseNode>(_camera)->toggleSensors(enabled);
+    }
+    sensor_enabled_ = enabled;
+}
+
 void CameraDriver::start()
 {
     if (!_camera)
