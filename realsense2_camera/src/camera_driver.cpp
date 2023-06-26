@@ -855,6 +855,11 @@ void CameraDriver::copyFrame(rs2::frame frame, ImageData& image_data) const
             image_data.image->encoding = enc::MONO16;
             image_data.image->step = profile.width() * sizeof(uint16_t);
         }
+        else if (format == RS2_FORMAT_RAW8) 
+        {
+            image_data.image->encoding = enc::MONO8;
+            image_data.image->step = profile.width() * sizeof(uint8_t);
+        }
         else 
         {
             ROS_WARN_THROTTLE(1.0, "Unsupported image format: %s", rs2_format_to_string(format));
